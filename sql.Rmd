@@ -1,0 +1,83 @@
+---
+title: "SQL"
+output: html_notebook: default
+---
+
+
+```{r}
+library(tidyverse)
+library(sqldf)
+```
+```{r}
+customer = read.csv("customer.csv", header=TRUE)
+trans = read.csv("transaction.csv", header=TRUE)
+```
+```{r}
+sqldf("select * from customer")
+```
+
+
+
+```{r}
+sqldf("select * from trans")
+```
+
+```{r}
+sqldf("select distinct province from customer")
+```
+
+
+```{r}
+sqldf("select * from trans order by total DESC, date DESC")
+```
+```{r}
+sqldf("select * from customer where city !='Kingston'")
+```
+
+```{r}
+sqldf("select * from trans where total > 100 or total < 200")
+```
+```{r}
+sqldf("select * from customer where status in ('silver', 'bronze')")
+```
+```{r}
+sqldf("select min(joined) from customer")
+```
+
+```{r}
+sqldf("select customer_id, SUM(total) from trans")
+```
+```{r}
+sqldf("SELECT id, name, MIN(joined) FROM customer;")
+```
+
+```{r}
+sqldf("SELECT id, name, joined FROM customer WHERE joined = (SELECT MIN(joined) FROM customer)")
+```
+
+```{r}
+sqldf("SELECT * from trans JOIN customer on trans.customer_id = customer.id;")
+
+```
+
+```{r}
+sqldf("SELECT * from trans JOIN customer on trans.customer_id = customer.id WHERE customer.status='gold'")
+
+```
+
+```{r}
+sqldf("CREATE TABLE song (
+  id INTEGER,
+  name STRING,
+  release_date DATE,
+  artist_id INTEGER,
+  length REAL,
+  album_id INTEGER
+);
+")
+```
+
+```{r}
+sqldf("select * from trans")
+```
+

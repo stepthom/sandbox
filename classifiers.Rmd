@@ -1,0 +1,110 @@
+---
+title: "Classifiers"
+---
+
+
+```{r}
+library(tidyverse)
+```
+
+First, let's load the data.
+
+```{r}
+dat <- read_csv("~/Dropbox/QSB/Previous/201706_MMA865/R/laheart2.csv")
+dat
+```
+
+Let's look at some of the summary statistics.
+
+```{r}
+summary(dat)
+```
+
+
+Now, let's preprocess the data by removing columns and making sure data types are correct.
+
+```{r}
+dat <- dat %>% select(-c(ID, DEATH_YR))
+dat$DEATH = as.factor(dat$DEATH)
+dat$MD_50 = as.factor(dat$MD_50)
+dat$MD_62 = as.factor(dat$MD_62)
+dat$CL_STATUS = as.factor(dat$CL_STATUS)
+dat$IHD_DX = as.factor(dat$IHD_DX)
+dat
+```
+
+
+# Decision Trees
+
+Build a decision tree model using the rpart package.
+
+Load the required packages.
+
+```{r}
+library(rpart)
+library(rattle)       # For pretty trees
+library(RColorBrewer) # For pretty trees
+```
+
+Build the model.
+
+```{r}
+fit <- rpart(DEATH ~ ., method="class", data=dat)
+fancyRpartPlot(fit)
+```
+
+Look at how the model predicts the data.
+
+```{r}
+pred = predict(fit, type="class") # Other "type" values are "class", vector", "prob", "matrix"
+```
+
+Let's look at the confusion matrix.
+
+```{r}
+xtab <- table(pred, dat$DEATH)
+xtab
+```
+
+And accuracy, which is 1 - error.
+
+```{r}
+1 - mean(pred != dat$DEATH)
+```
+
+More diagnostics.
+
+```{r}
+printcp(fit)
+```
+
+# Naive Bayes
+
+Load the required packages.
+```{r}
+library(e1071)
+```
+
+Build the model. Note that this implementation uses the Gaussian model (mean and std dev) for continuous variables.
+
+```{r}
+fitnb <- naiveBayes(DEATH ~ ., data=dat)
+fitnb
+```
+Look at how the model predicts the data.
+
+```{r}
+prednb = predict(fitnb, dat) # Other "type" values are "class", vector", "prob", "matrix"
+```
+
+Let's look at the confusion matrix.
+
+```{r}
+table(prednb, dat$DEATH)
+```
+
+And accuracy, which is 1 - error.
+
+```{r}
+1 - mean(prednb != dat$DEATH)
+```

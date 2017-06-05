@@ -1,0 +1,41 @@
+---
+title: "Association Rules"
+output:
+  pdf_document: default
+  html_notebook: default
+---
+
+```{r}
+library(arules)
+```
+
+
+```{r}
+data("Groceries")
+```
+
+# Build the rules
+
+```{r}
+rules <- apriori(Groceries, parameter = list(supp = 0.01, conf = 0.3, target = "rules"))
+```
+
+```{r}
+# List the top 40 rules, ordered by lift
+inspect(head(rules, n=40, by = "lift"))
+```
+```{sql connection=}
+
+```
+
+```{r}
+# Calculate another interestingness measure: conviction
+quality(rules) <- cbind(quality(rules),
+                  conviction = interestMeasure(rules, measure="conviction", transactions = Groceries))
+```
+
+```{r}
+# List the top 40 rules, ordered by lift
+inspect(head(rules, n=40, by = "conviction"))
+```
+
