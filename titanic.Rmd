@@ -1,0 +1,477 @@
+---
+title: "Classification Case Study: The Titanic"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r message=FALSE}
+library(tidyverse)
+library(scales)
+library(titanic)
+library(rpart)
+library(rpart.plot)
+library(RColorBrewer)
+```
+
+
+# Introduction
+
+On 11 April 1912, Mr. Patrick Dooley boarded the legendary Titanic passenger liner in Queenstown, Ireland, destined for a new life in New York City. Mr. Dooley was a 32 year old male, traveling without any family. He paid £7.75 for his ticket. What were the chances that Mr. Dooley would survive a catastrophic shipwreck?
+ 
+The sinking of the Titanic is one of the most infamous shipwrecks in history. On 15 April 1912, during her maiden voyage from England to the New York City, the Titanic sank after colliding with an iceberg, killing 1,502 out of 2,224 passengers and crew. This sensational tragedy shocked the international community and led to better safety regulations for ships.
+ 
+One of the reasons that the shipwreck led to such loss of life was that there were not enough lifeboats for the passengers and crew. Although there was some element of luck involved in surviving the sinking, some groups of people were more likely to survive than others, such as women, children, and the upper-class.
+ 
+In this exercise, we will build analytics models to determine and quantify exactly which sorts of people were more likely to survive. In particular, we will construct a decision tree classifier model, and we will examine its output. This will (a) give us an understanding of which sorts of people were likely to survive, and (b) allow us to predict whether an individual, such as Mr. Patrick Dooley, would have survived. 
+
+
+## Learning Objectives
+
+- Understand and interpret the results of a decision tree classifier model.
+- Use a decision tree classifier model to predict new data instances.
+
+# Loading the Data
+
+The Titanic dataset is a popular and widely-used dataset in the analytics and machine learning circles. This dataset is based on the Titanic Passenger List edited by Michael A. Findlay, originally published in Eaton & Haas (1994) Titanic: Triumph and Tragedy, Patrick Stephens Ltd, and expanded with the help of the internet community. It contains data for 891 passengers. 
+
+```{r}
+
+TODO: ONly load the training data here; create a cleaning funciton that I can pass both into.
+
+
+full <- bind_rows(titanic_train, titanic_test)
+str(full)
+```
+
+A good idea when performing any data analytics activity is to spend time looking at some of the raw data. 
+
+```{r}
+head(full, n=20)
+```
+
+# Data Cleaning
+
+```{r}
+full$Pclass = as.factor(full$Pclass)
+full$Sex = as.factor(full$Sex)
+full$Embarked = as.factor(full$Embarked)
+full$Survived = full$Survived==1
+
+# Since their fare was $80 for 1st class, they most likely embarked from 'C'
+full$Embarked[c(62, 830)] <- 'C'
+
+# Replace missing fare value with median fare for class/embarkment
+full$Fare[1044] <- median(full[full$Pclass == '3' & full$Embarked == 'S', ]$Fare, na.rm = TRUE)
+```
+
+# Feature Engineering
+
+In addition to the above variables in the dataset, we can create new variables to provide additional insight. (This process is called feature engineering.)
+ 
+First, we can calculate whether a passenger was an adult or a child. We do so by checking whether the passenger’s age is greater than or less than 18, respectively.
+
+```{r}
+full$Child[full$Age < 18] <- 'Child'
+full$Child[full$Age >= 18] <- 'Adult'
+full$Child = as.factor(full$Child)
+```
+ 
+Second, we can calculate a passenger’s total family size by summing their siblings and spouses (sibsp) with their parents and children (parch). 
+
+```{r}
+full$Fsize <- full$SibSp + full$Parch + 1
+```
+ 
+Third, we can examine the name variable to extract the passenger’s title, such as Mr., Mrs., etc. 
+
+```{r}
+full$Title <- as.factor(gsub('(.*, )|(\\..*)', '', full$Name))
+full$Title = as.factor(full$Title)
+```
+ 
+Finally, we can calculate whether a passenger was a mother. We do so by checking if the passenger is female (sex), older than 18 (age), and has at least one child (parch).
+
+```{r}
+full$Mother <- 'Not Mother'
+full$Mother[full$Sex == 'female' & full$Parch > 0 & full$Age > 18 & full$Title != 'Miss'] <- 'Mother'
+full$Mother = as.factor(full$Mother)
+```
+
+
+```{r}
+# Discretize family size
+full$FsizeD[full$Fsize == 1] <- 'singleton'
+full$FsizeD[full$Fsize < 5 & full$Fsize > 1] <- 'small'
+full$FsizeD[full$Fsize > 4] <- 'large'
+```
+
+
+```{r}
+
+# Create a Deck variable. Get passenger deck A - F:
+full$Deck<-factor(sapply(full$Cabin, function(x) strsplit(x, NULL)[[1]][1]))
+```
+
+
+
+# Another Data Sample
+
+Now that we've cleaned the data and added some new variables, let's look again.
+
+```{r}
+head(full, n=20)
+```
+
+```{r}
+str(full)
+```
+
+# Descriptive Statistics
+
+It’s always a good idea to get familiar with the data by understanding the variables. How many are there, what are their types, are there any special notes? Let’s do just that.
+ 
+The dataset contains the following 12 variables for each passenger. 
+
+
+
+## Variable: pclass
+
+Below is a cross tabulation for the variables pclass (rows) and survived (columns), along with sums of each row and column.
+
+```{r}
+addmargins(table(full$Pclass, full$Survived, dnn=c("Class", "Survive")))
+```
+ 
+The tables shows us that, for example, there are a total of 216 passengers in class 1. Of those, 80 did not survive, while 136 did survive. Likewise, of those passengers that did survive, 136 of them came from class 1.
+ 
+Below is a graphical representation of the same tabulation, color-coded by those who survived (blue, bottom) and those who did not (orange, top):
+
+```{r}
+qplot(Pclass, data=full, geom="bar", fill=factor(Survived), xlab="Class")
+```
+
+We see that most passengers are in class 3. However, those passengers in class 1 had a much higher survival rate.
+
+
+## Variable: age
+
+Let’s look at the age variable. As it is a continuous variable, we first bin the values into buckets to make the cross tabulation more meaningful. For example, the first bucket below contains all 55 passengers between the ages of 0 and 7 years old. 
+
+```{r}
+full$age.cut = cut(full$Age, breaks=c(0, 7, 18, 40, 100))
+addmargins(table(full$age.cut, full$Survived, dnn=c("Age", "Survive")))
+``` 
+
+Also, as age is continuous, let’s look at its summary statistics, such as minimum, maximum, etc.
+
+```{r}
+summary(full$Age)
+```
+ 
+ 
+ 
+```{r}
+qplot(age.cut, data=full, geom="bar", fill=factor(Survived), xlab="Age")
+```
+
+We see that the average passenger age was 28 years old. Also, very young children had a good chance of survival, while the rest of the age groups were less fortunate.
+
+
+## Variable: sex
+
+Now we turn to the sex of each passenger.
+
+```{r}
+addmargins(table(full$Sex, full$Survived, dnn=c("Sex", "Survive")))
+```
+
+While there are more males aboard, females had a much better chance of survival.
+
+```{r}
+qplot(Sex, data=full, geom="bar", fill=factor(Survived), xlab="Sex")
+```
+
+
+
+## Variable: fare
+
+Now let’s look at ticket fare. Like age, it is a continuous variable, so we first bin the data into buckets.
+
+```{r}
+full$fare.cut = cut(full$Fare, breaks=c(0,  10, 20, 50, 100, 550), include.lowest=TRUE)
+addmargins(table(full$fare.cut, full$Survived, dnn=c("Fare", "Survive")))
+```
+
+```{r}
+summary(full$Fare)
+```
+
+```{r}
+qplot(fare.cut, data=full, geom="bar", fill=factor(Survived), xlab="Fare")
+```
+
+
+We see that most fares were below 15 pounds. (One fare was even 0 pounds. There’s probably an interesting story behind that!) However, there is a long tail: some tickets were 10-30 times as expensive, upwards of 500 pounds.
+
+
+## Variable: embarked
+
+From where did each passenger embark? As a historical sidenote, the Titanic departed from Southampton, England on 3 April 1912; Cherbourg, France on 10 April 1912; and Queenstown, Ireland on 11 April 1912.
+
+```{r}
+addmargins(table(full$Embarked, full$Survived, dnn=c("Embarked", "Survive")))
+```
+
+Most passengers boarded in Southampton. However, those that boarded in Cherbourg had the best chance of survival. 
+
+```{r}
+qplot(Embarked, data=full, geom="bar", fill=factor(Survived), xlab="Embarked")
+```
+
+
+### Variable: title
+
+```{r}
+addmargins(table(full$Title, full$Survived, dnn=c("Title", "Survive")))
+```
+
+```{r}
+qplot(Title, data=full, geom="bar", fill=factor(Survived), xlab="Title")+
+  theme(axis.text.x = element_text(angle = 90, hjust = 1)) 
+```
+    
+ 
+Most titles were rare. The most common titles were Mr., Miss, Mrs., and Master. Of those, only the titles Mrs. and Miss had a good chance of survival. This is consistent with what we saw for the sex variable, where females had a better survival rate than men in general.
+
+
+
+## Variable: family size
+
+Family size is one of our engineered variables. Values of one indicate that the passenger was traveling alone. 
+ 
+```{r}
+
+```
+ 
+          Survive
+FamilySize   0   1 Sum
+       1   374 163 537
+       2    72  89 161
+       3    43  59 102
+       4     8  21  29
+       5    12   3  15
+       6    19   3  22
+       7     8   4  12
+       8     6   0   6
+       11    7   0   7
+       Sum 549 342 891
+ 
+ 
+
+We see that most passengers were singletons. This is due to the large number of third class passengers. Many third class passengers travelled alone, or some with friends, which is
+not under the umbrella of the sibsp definition. Also, many third class passengers were immigrating to the US. While they were married, they did not have their spouse aboard ship with them. They were sent off alone to establish a foothold and then later send for their spouses.
+
+```{r}
+qplot(Fsize, data=full, geom="bar", fill=factor(Survived), xlab="Family Size")
+```
+
+
+## Variable: mother
+
+
+```{r}
+addmargins(table(full$Mother, full$Survived, dnn=c("Mother", "Survive")))
+```
+
+We see that most passengers were not mothers (according to our definition, at least), but mothers did survive more often.
+
+```{r}
+qplot(Mother, data=full, geom="bar", fill=factor(Survived), xlab="Mother")
+```
+
+
+## Variable: child
+
+
+```{r}
+addmargins(table(full$Child, full$Survived, dnn=c("Child", "Survive")))
+```
+
+ 
+We see that most passengers were adults. However, children had a better survival rate.
+ 
+ 
+```{r}
+qplot(Child, data=full, geom="bar", fill=factor(Survived), xlab="Child")
+```
+
+
+
+## Variable: survived
+
+Finally, let’s examine the survived variable. The tabulation below is overkill, but it’s useful to look at it for verification.
+
+```{r}
+addmargins(table(full$Survived, full$Survived, dnn=c("Survived", "Survive")))
+```
+
+
+We see that most passengers unfortunately did not survive.
+
+```{r}
+qplot(Survived, data=full, geom="bar", fill=factor(Survived), xlab="Survived")
+```
+
+
+# Building a Classifier Model
+
+Now that we have explored the data, it’s time to dive deeper. Which variable(s) are the biggest predictors of survival? Is it age, pclass, mother? All three variables seem to play a role, but we don’t yet know which are the most important. This is where classifier models shine. They can tell us exactly how all the variables relate to each other, and which are most important.
+ 
+A decision tree is a popular classifier model in analytics. Here, the decision tree is automatically created by a machine learning algorithm as it learns simple decision rules from the data. These automatically-learned rules can then be used to both understand the variables and to predict future data. A big advantage of decision trees over other classifier models is that they are relatively simple for humans to understand and interpret.
+ 
+A decision tree consists of nodes. Each node splits the data according to a rule. A rule is based on a variable in the data. For example, a rule might be “Age greater than 30.” In this case, the node splits the data by the age variable; those passengers that satisfy the rule (i.e., are greater than 30) follow the left path out of the node; the rest follow the right path out of the node. In this way, paths from the root node down to leaf nodes are created, describing the fate of certain types of passengers.
+ 
+A decision tree path always starts with a root node (node number 1), which contains the most important splitting rule. Each subsequent node contains the next most important rule. After the decision tree is automatically created by the machine learning algorithm, one can use the decision tree to classify an individual by simply following a path: start at the root node and apply each rule to follow the appropriate path until you hit an end.
+ 
+When creating a decision tree from data, the analyst can specify the number of nodes for the machine learning algorithm to create. More nodes leads to a more accurate model, at the cost of a more complicated and harder-to-interpret model. Likewise, fewer nodes usually leads to a less accurate model, but the model is easier to understand and interpret. 
+ 
+Let's create the model. Let's shoot for fewer nodes, and therefore a simpler and less accurate model. Later, we'll look at a decision tree with more nodes. 
+
+
+```{r}
+train <- full[1:891,]
+test <- full[892:1309,]
+
+form = as.formula(Survived ~ Pclass + Sex + Age + Fare + Embarked + Fsize + Child + Mother)
+tree <- rpart(form,train)
+```
+
+
+The textual rendering contains the node number, the rule, the number of rows that matched this rule, the deviance of this rule, and finally, the probability of survival at this node.
+
+```{r}
+tree
+```
+
+
+```{r}
+printcp(tree)
+```
+
+Let's look at a graphical rendering of the decision tree.
+
+```{r}
+rpart.plot(tree)
+```
+
+Let's look at the confusion matrix.
+
+```{r}
+predictions = predict(tree) < 0.5
+table(predictions, train$Survived)
+```
+
+Let's check the accuracy of the decision tree.
+
+```{r}
+1-mean(predictions == train$Survived)
+```
+
+
+ 
+# Questions
+
+After digesting the above decision tree, answer the following questions.
+ 
+- What is the most important variable in the decision tree? That is, which is the most important variable for predicting survival?
+ 
+- Which path in the tree has the highest probability of survival?
+ 
+- Which paths in the tree have the lowest probability of survival?
+ 
+- What would be the chances of survival of a third class female?
+ 
+- Of all third class females, what is the effect of ticket fares?
+ 
+- Of males that are younger than 6.5 years old, which variable most predicted their fate?
+ 
+- Which path is taken by the most passengers?
+ 
+- Using the decision tree model, what would be the most likely fate for the following passenger?
+ID=891, Pclass=3, Name=Mr. Patrick Dooley, Sex=male, Age=32, Sibsp=0, Parch=0, TicketNumber=370376, Fare=7.75, Cabin=N/A, Embarked=Q, Title=Mr, Fsize=1, Child=Adult, Mother=NotMother
+
+
+# Appendix A: Frequently Asked Questions
+
+#### For females of the third class, why do higher fares mean a smaller chance of survival? Isn’t this counter-intuitive?
+ 
+Yes, it is counter-intuitive. I have dug into the data a little bit. One thing that I found is that for the 27 third-class females whose fare was >= 23 pounds, most belonged to one of only five families. It might be that case that families tended to perish together for some tragic, unknowable reason.
+ 
+#### For those over age 25, the mean number of spouses/siblings is about 0.34. This seems a little low, does it not?
+ 
+One possible explanation is the overwhelming "Third Class Bias," as it is called. Many third class passengers travelled alone, or some with friends, which is not under the umbrella of the sibsp definition.  Also, many third classers were immigrating to the US. They were married, but were sent off alone to establish a foothold and then later sent for their spouses.
+ 
+#### For those under age 14 the mean number parents/children is 1.37. This seems a bit low.
+
+Not all children travelled with their parents, especially in third class.  Some children travelled with older siblings, nannies, aunts/uncles, etc.  Actually, more often than not, children travelled with only one parent. After further investigation. Here are a few unusual passenger cases that came up:
+
+- Case #1:  Emanuel, Miss. Virginia Ethel. 3d Class. Age 5. sibsp/parch=0/0
+    - Boarded with her nurse Miss. Elizabeth Dowdell. Escorted her to grandparents' home in New York, NY.
+- Case #2:  Hassan, Mr. Houssein G N. 3d Class. Age 11. s/p=0/0
+    - Traveled with family friend Mr. Nassef Cassem Albimona. Going to visit his parents in America from Lebanon. (Interesting note: Albimona was from Fredericksburg, VA)
+- Case #3:  Ayoub, Miss. Banoura. 3d Class. Age 13. s/p=0/0
+    - Boarded with 5 cousins. Travelling to Detroit, MI to be reunited with family.
+- Case #4:  Nasser, Mrs. Nicholas Nasser. 2nd Class. Age 14. s/p=1/0
+    - Married to a 32 year old man... sibsp stands for spouse rather than sibling... unusual at such a young age. She lied when she boarded the Titanic and claimed she was 18. However, her birth certificate proves that on April 15, 1912 she was 14, not 18!
+
+
+## Appendix B: A More Complicated Decision Tree
+
+Below is a decision tree that has been created by allowing the machine learning algorithm to create more nodes. While the tree is more accurate (88.5%), it is also harder to interpret and use practically. 
+
+```
+  1) root 891 210.7273000 0.38383840  
+    2) Sex=male 577  88.4090100 0.18890810  
+      4) Age>=6.5 551  75.9709600 0.16515430  
+        8) Pclass=2,3 431  42.6542900 0.11136890  
+         16) Fare< 51.6979 415  38.5445800 0.10361450  
+           32) Age>=13 402  35.2164200 0.09701493  
+             64) Fare>=13.93125 80   3.8000000 0.05000000 *
+             65) Fare< 13.93125 322  31.1956500 0.10869570  
+              130) Fare< 7.9104 174  12.8735600 0.08045977 *
+              131) Fare>=7.9104 148  18.0202700 0.14189190  
+                262) Fare>=7.9875 135  14.1037000 0.11851850 *
+                263) Fare< 7.9875 13   3.0769230 0.38461540 *
+           33) Age< 13 13   2.7692310 0.30769230 *
+         17) Fare>=51.6979 16   3.4375000 0.31250000 *
+        9) Pclass=1 120  27.5916700 0.35833330  
+         18) Age>=53 24   2.6250000 0.12500000 *
+         19) Age< 53 96  23.3333300 0.41666670  
+           38) Fare>=32.5104 59  13.5254200 0.35593220  
+             76) Fsize< 1.5 21   3.2380950 0.19047620 *
+             77) Fsize>=1.5 38   9.3947370 0.44736840 *
+           39) Fare< 32.5104 37   9.2432430 0.51351350  
+             78) Fare< 26.3375 12   2.2500000 0.25000000 *
+             79) Fare>=26.3375 25   5.7600000 0.64000000 *
+      5) Age< 6.5 26   5.5384620 0.69230770 *
+    3) Sex=female 314  60.1051000 0.74203820  
+      6) Pclass=3 144  36.0000000 0.50000000  
+       12) Fare>=23.35 27   2.6666670 0.11111110 *
+       13) Fare< 23.35 117  28.3076900 0.58974360  
+         26) Age>=36.5 11   1.6363640 0.18181820 *
+         27) Age< 36.5 106  24.6509400 0.63207550  
+           54) Embarked=S 55  13.7090900 0.52727270  
+            108) Fare< 10.825 32   7.8750000 0.43750000  
+              216) Fare>=7.9875 13   2.3076920 0.23076920 *
+              217) Fare< 7.9875 19   4.6315790 0.57894740 *
+            109) Fare>=10.825 23   5.2173910 0.65217390 *
+           55) Embarked=C,Q 51   9.6862750 0.74509800  
+            110) Fare< 15.3729 39   8.3076920 0.69230770  
+              220) Fare>=8.08335 10   2.4000000 0.40000000 *
+              221) Fare< 8.08335 29   4.7586210 0.79310340 *
+            111) Fare>=15.3729 12   0.9166667 0.91666670 *
+      7) Pclass=1,2 170   8.5235290 0.94705880 *
+```
