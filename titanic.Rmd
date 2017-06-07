@@ -337,7 +337,7 @@ Let's create the model. Let's shoot for fewer nodes, and therefore a simpler and
 
 ```{r}
 form = as.formula(Survived ~ Pclass + Sex + Age + Fare + Embarked + Fsize + Child + Mother)
-tree <- rpart(form, train)
+tree <- rpart(form, train, method="class")
 ```
 
 
@@ -355,15 +355,14 @@ printcp(tree)
 Let's look at a graphical rendering of the decision tree.
 
 ```{r}
-rpart.plot(tree)
+rpart.plot(tree, extra=2)
 ```
 
 Let's use the classifier to predict the class of the testing data.
 
 
-
 ```{r}
-predicted = predict(tree, test) > 0.5
+predicted = predict(tree, test, type="class")
 ```
 
 Let's look at the confusion matrix.
