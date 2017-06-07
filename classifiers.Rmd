@@ -5,34 +5,49 @@ title: "Classifiers"
 
 ```{r}
 library(tidyverse)
+library(MLmetrics)
 ```
 
 First, let's load the data.
 
 ```{r}
-dat <- read_csv("~/Dropbox/QSB/Previous/201706_MMA865/R/laheart2.csv")
-dat
+df <- read_csv("~/sandbox/laheart2.csv")
+df
 ```
 
 Let's look at some of the summary statistics.
 
 ```{r}
-summary(dat)
+summary(df)
 ```
 
+# Cleaning
 
-Now, let's preprocess the data by removing columns and making sure data types are correct.
+Now, let's do some basic cleaning by removing columns and making sure data types are correct.
+
+DEATH_YR is redundant with DEATH, and therefore will let the classifiers "cheat." Remove.
+Also, ID won't be helpful.
 
 ```{r}
-dat <- dat %>% select(-c(ID, DEATH_YR))
-dat$DEATH = as.factor(dat$DEATH)
-dat$MD_50 = as.factor(dat$MD_50)
-dat$MD_62 = as.factor(dat$MD_62)
-dat$CL_STATUS = as.factor(dat$CL_STATUS)
-dat$IHD_DX = as.factor(dat$IHD_DX)
-dat
+df <- df %>% select(-c(ID, DEATH_YR))
+df$DEATH = as.factor(df$DEATH)
+df$MD_50 = as.factor(df$MD_50)
+df$MD_62 = as.factor(df$MD_62)
+df$CL_STATUS = as.factor(df$CL_STATUS)
+df$IHD_DX = as.factor(df$IHD_DX)
+df
 ```
 
+
+# Training and Testing
+
+First thing's first, let's split the data into training and testing.
+
+```{r}
+set.seed(123)
+train <- sample_frac(df, 0.8)
+test <- setdiff(df, train)
+```
 
 # Decision Trees
 
@@ -42,40 +57,56 @@ Load the required packages.
 
 ```{r}
 library(rpart)
-library(rattle)       # For pretty trees
-library(RColorBrewer) # For pretty trees
+library(rpart.plot) # For pretty trees
 ```
+
+
 
 Build the model.
 
 ```{r}
-fit <- rpart(DEATH ~ ., method="class", data=dat)
-fancyRpartPlot(fit)
+tree <- rpart(DEATH ~ ., method="class", data=train)
+```
+
+
+```{r}
+tree
+```
+
+
+```{r}
+printcp(tree)
+```
+
+Let's look at a graphical rendering of the decision tree.
+
+```{r}
+rpart.plot(tree, extra=2)
 ```
 
 Look at how the model predicts the data.
 
 ```{r}
-pred = predict(fit, type="class") # Other "type" values are "class", vector", "prob", "matrix"
+predicted = predict(tree, test, type="class")
 ```
 
 Let's look at the confusion matrix.
 
 ```{r}
-xtab <- table(pred, dat$DEATH)
-xtab
+actual = test$DEATH
+table(actual, predicted)
 ```
 
-And accuracy, which is 1 - error.
+Let's check the accuracy and other metrics of the classifier on the testing data.
 
 ```{r}
-1 - mean(pred != dat$DEATH)
-```
-
-More diagnostics.
-
-```{r}
-printcp(fit)
+print(sprintf("Accuracy:    %.3f", Accuracy(y_true=actual, y_pred=predicted)))
+print(sprintf("AUC:         %.3f", AUC(y_true=actual, y_pred=predicted)))
+print(sprintf("Precision:   %.3f", Precision(y_true=actual, y_pred=predicted)))
+print(sprintf("Recall:      %.3f", Recall(y_true=actual, y_pred=predicted)))
+print(sprintf("F1 Score:    %.3f", F1_Score(predicted, actual)))
+print(sprintf("Sensitivity: %.3f", Sensitivity(y_true=actual, y_pred=predicted)))
+print(sprintf("Specificity: %.3f", Specificity(y_true=predicted, y_pred=actual)))
 ```
 
 # Naive Bayes
@@ -88,23 +119,31 @@ library(e1071)
 Build the model. Note that this implementation uses the Gaussian model (mean and std dev) for continuous variables.
 
 ```{r}
-fitnb <- naiveBayes(DEATH ~ ., data=dat)
-fitnb
+nb <- naiveBayes(DEATH ~ ., data=train)
+nb
 ```
 Look at how the model predicts the data.
 
+
 ```{r}
-prednb = predict(fitnb, dat) # Other "type" values are "class", vector", "prob", "matrix"
+predicted.nb = predict(nb, test, type="class")
 ```
 
 Let's look at the confusion matrix.
 
 ```{r}
-table(prednb, dat$DEATH)
+actual.nb = test$DEATH
+table(actual.nb, predicted.nb)
 ```
 
-And accuracy, which is 1 - error.
+Let's check the accuracy and other metrics of the classifier on the testing data.
 
 ```{r}
-1 - mean(prednb != dat$DEATH)
+print(sprintf("Accuracy:    %.3f", Accuracy(y_true=actual.nb, y_pred=predicted.nb)))
+print(sprintf("AUC:         %.3f", AUC(y_true=actual.nb, y_pred=predicted.nb)))
+print(sprintf("Precision:   %.3f", Precision(y_true=actual.nb, y_pred=predicted.nb)))
+print(sprintf("Recall:      %.3f", Recall(y_true=actual.nb, y_pred=predicted.nb)))
+print(sprintf("F1 Score:    %.3f", F1_Score(predicted.nb, actual.nb)))
+print(sprintf("Sensitivity: %.3f", Sensitivity(y_true=actual.nb, y_pred=predicted.nb)))
+print(sprintf("Specificity: %.3f", Specificity(y_true=predicted.nb, y_pred=actual.nb)))
 ```
