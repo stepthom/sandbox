@@ -2,7 +2,7 @@
 title: "Intro to sparklyr"
 ---
 
-*Note: this tutorial originally comes from the wonderful people at sparklyr.
+*Note: this tutorial originally comes from the wonderful people at sparklyr.*
 
 Install these packages if you don't have them already
 
@@ -12,6 +12,8 @@ install.packages(c("nycflights13", "Lahman"))
 
 # Connect to Spark
 
+The following command is how to connect to Spark on the CAC machines. If you take this script to work or somewhere else, the `spark_hom` parameter may be different.
+
 ```{r}
 library(sparklyr)
 sc <- spark_connect(master = "yarn-client", spark_home = "/usr/hdp/current/spark-client/")
@@ -19,12 +21,22 @@ sc <- spark_connect(master = "yarn-client", spark_home = "/usr/hdp/current/spark
 
 # Load some data into Spark
 
+There are two ways to load data into Spark:
+
+1. Load some data regularly, then use the `copy_to` command.
+2. Use sparklyr's `spark_read_*` commands to read data that's on HDFS.
+
+Since, for now, I haven't put any data on HDFS, we'll use the first method. The data we'll load is the classic, simple iris dataset (which comes with `dplyr`) and some flights and baseball data, just for fun.
+
 
 ```{r}
 library(dplyr)
 iris_tbl <- copy_to(sc, iris)
+head(iris_tbl)
 flights_tbl <- copy_to(sc, nycflights13::flights, "flights")
+head(flights_tbl)
 batting_tbl <- copy_to(sc, Lahman::Batting, "batting")
+head(batting_tbl)
 ```
 
 # Manipulate Data
@@ -48,12 +60,12 @@ flights_tbl %>% filter(dep_delay == 2)
 # an example from the dplyr library
 delay <- flights_tbl %>% 
   group_by(tailnum) %>%
-  summarise(count = n(), dist = mean(distance), delay = mean(arr_delay)) %>%
-  filter(count > 20, dist < 2000, !is.na(delay)) %>%
-  collect()
+    summarise(count = n(), dist = mean(distance), delay = mean(arr_delay)) %>%
+      filter(count > 20, dist < 2000, !is.na(delay)) %>%
+        collect()
 
-delay
-```
+        delay
+        ```
 
 # Plot some data
 
@@ -62,9 +74,9 @@ delay
 library(ggplot2)
 ggplot(delay, aes(dist, delay)) +
   geom_point(aes(size = count), alpha = 1/2) +
-  geom_smooth() +
-  scale_size_area(max_size = 2)
-```
+    geom_smooth() +
+      scale_size_area(max_size = 2)
+      ```
 
 # Using SQL
 ```{r}
