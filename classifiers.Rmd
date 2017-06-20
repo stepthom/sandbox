@@ -12,14 +12,8 @@ First, let's load the data.
 
 ```{r}
 df <- read_csv("~/sandbox/laheart2.csv")
-df
 ```
 
-Let's look at some of the summary statistics.
-
-```{r}
-summary(df)
-```
 
 # Cleaning
 
@@ -38,13 +32,21 @@ df$IHD_DX = as.factor(df$IHD_DX)
 df
 ```
 
+# Preview
+
+Let's look at some of the summary statistics and a sampling of the data.
+
+```{r}
+summary(df)
+df
+```
 
 # Training and Testing
 
 First thing's first, let's split the data into training and testing.
 
 ```{r}
-set.seed(123)
+set.seed(123) # Set the seed to make it reproducible
 train <- sample_frac(df, 0.8)
 test <- setdiff(df, train)
 ```
@@ -81,13 +83,13 @@ printcp(tree)
 Let's look at a graphical rendering of the decision tree.
 
 ```{r}
-rpart.plot(tree, extra=2)
+rpart.plot(tree, extra=2, type=2)
 ```
 
 Look at how the model predicts the data.
 
 ```{r}
-predicted = predict(tree, test, type="class")
+predicted = predict(tree, test, type="class") 
 ```
 
 Let's look at the confusion matrix.
@@ -101,7 +103,7 @@ Let's check the accuracy and other metrics of the classifier on the testing data
 
 ```{r}
 print(sprintf("Accuracy:    %.3f", Accuracy(y_true=actual, y_pred=predicted)))
-print(sprintf("AUC:         %.3f", AUC(y_true=actual, y_pred=predicted)))
+print(sprintf("AUC:         %.3f", AUC(y_pred=predicted, y_true=actual)))
 print(sprintf("Precision:   %.3f", Precision(y_true=actual, y_pred=predicted)))
 print(sprintf("Recall:      %.3f", Recall(y_true=actual, y_pred=predicted)))
 print(sprintf("F1 Score:    %.3f", F1_Score(predicted, actual)))
