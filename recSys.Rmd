@@ -1,0 +1,122 @@
+---
+title: "Recommender Systems"
+---
+
+This script was inspired by the following: https://ashokharnal.wordpress.com/2014/12/18/using-recommenderlab-for-predicting-ratings-for-movielens-data/
+
+```{r}
+library(recommenderlab)
+library(ggplot2)
+```
+
+
+```{r}
+data(MovieLense)
+r <- MovieLense
+# Look at the first few rows. Need to turn it into a data frame first, because
+head(as(r, "data.frame"))
+```
+ 
+```{r}
+# normalize the rating matrix
+r_m <- normalize(r)
+
+# Look at the first few rows. Need to turn it into a data frame first, because
+head(as(r_m, "data.frame"))
+```
+
+
+
+# Explore and Visualize
+
+Draw an image plot of raw-ratings & normalized ratings
+A column represents one specific movie and ratings by users are shaded. Note that some items are always rated 'black' by most users
+while some items are not rated by many users. On the other hand a few users always give high ratings
+as in some cases a series of black dots cut across items.
+
+```{r}
+image(r, main = "Raw Ratings")       
+image(r_m, main = "Normalized Ratings")
+```
+
+# Can also turn the matrix into a 0-1 binary matrix
+```{r}
+r_b <- binarize(r, minRating=1)
+as(r_b, "matrix")
+```
+
+
+# Create a recommender  (model)
+
+There are a few different algorithms.
+- UBCF: User-based collaborative filtering
+- IBCF: Item-based collaborative filtering
+- Parameter 'method' decides similarity measure
+  - Cosine or Jaccard
+
+```{r}
+rec=Recommender(r[1:nrow(r)],method="UBCF", param=list(normalize = "Z-score",method="Cosine",nn=5))
+rec=Recommender(r[1:nrow(r)],method="UBCF", param=list(normalize = "Z-score",method="Jaccard",nn=5, minRating=1))
+rec=Recommender(r[1:nrow(r)],method="IBCF", param=list(normalize = "Z-score",method="Jaccard",minRating=1))
+rec=Recommender(r[1:nrow(r)],method="POPULAR")
+```
+
+# Depending upon your selection, examine what you got
+
+```{r}
+print(rec)
+names(getModel(rec))
+getModel(rec)$nn
+``` 
+
+# Create Predictions
+
+
+This prediction does not predict movie ratings for test.
+But it fills up the user 'X' item matrix so that
+for any userid and movieid, I can find predicted rating
+dim(r) shows there are 6040 users (rows)
+'type' parameter decides whether you want ratings or top-n items
+get top-10 recommendations for a user, as:
+predict(rec, r[1:nrow(r)], type="topNList", n=10)
+
+```{r}
+recom <- predict(rec, r[1:nrow(r)], type="ratings")
+recom
+```
+ 
+# Examination of model & experimentation
+
+
+```{r}
+# Convert prediction into list, user-wise
+as(recom, "list")
+# Study and Compare the following:
+as(r, "matrix")     # Has lots of NAs. 'r' is the original matrix
+as(recom, "matrix") # Is full of ratings. NAs disappear
+as(recom, "matrix")[,1:10] # Show ratings for all users for items 1 to 10
+as(recom, "matrix")[5,3]   # Rating for user 5 for item at index 3
+as.integer(as(recom, "matrix")[5,3]) # Just get the integer value
+as.integer(round(as(recom, "matrix")[6039,8])) # Just get the correct integer value
+as.integer(round(as(recom, "matrix")[368,3717])) 
+```
+
+# Look at some of the results
+
+```{r}
+# Convert all your recommendations to list structure
+rec_list<-as(recom,"list")
+head(summary(rec_list))
+# Access this list. User 2, item at index 2
+rec_list[[2]][2]
+# Convert to data frame all recommendations for user 1
+u1<-as.data.frame(rec_list[[1]])
+attributes(u1)
+class(u1)
+# Create a column by name of id in data frame u1 and populate it with row names
+u1$id<-row.names(u1)
+# Check movie ratings are in column 1 of u1
+u1
+# Now access movie ratings in column 1 for u1
+u1[u1$id==3952,1]
+```
