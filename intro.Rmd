@@ -100,7 +100,7 @@ countries, we can combine `select` and `filter`
 
 ```{r}
 gapminder %>%
-    filter(continent=="Europe") %>%
+    filter(continent =="Asia") %>%
     select(year,country,gdpPercap)
 ```
 
@@ -149,7 +149,7 @@ original dataframe into multiple pieces, then we can run functions
 (e.g. `mean()` or `sd()`) within `summarize()`.
 
 ```{r}
-gdp_bycontinents <- gapminder %>%
+gapminder %>%
     group_by(continent) %>%
     summarize(mean_gdpPercap=mean(gdpPercap))
 ```
