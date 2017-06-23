@@ -9,10 +9,15 @@ output:
 library(arules)
 ```
 
+# Load the data
 
 ```{r}
 data("Groceries")
 ```
+
+# Explore and Visualize
+
+
 
 # Build the rules
 
