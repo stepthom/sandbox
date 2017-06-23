@@ -1,0 +1,108 @@
+---
+title: "SQL Challenge"
+---
+
+
+```{r, message=FALSE}
+library(tidyverse)
+library(sqldf)
+library(Lahman)
+```
+
+
+### Let's just look at the structure of the tables we will use
+
+
+```{r}
+sqldf("select * from Master limit 10")
+```
+
+```{r}
+sqldf("select * from Salaries limit 10")
+```
+
+
+# Easy Questions
+
+## Question: When and where was Derek Jeter born?
+
+```{r}
+sqldf("SELECT birthDate, birthCity, birthState, birthCountry from Master where nameFirst=\"Derek\" and nameLast=\"Jeter\"")
+```
+
+
+## Question: How many unique players are there in the database?
+
+```{r}
+sqldf("SELECT count(distinct playerID) from Master")
+```
+
+## Question: What is the highest salary ever?
+
+```{r}
+sqldf("SELECT max(salary) from Salaries")
+```
+
+## Question: What is the average salary for each year?
+
+```{r}
+sqldf("SELECT yearID, AVG(salary) FROM Salaries GROUP BY yearID ORDER BY yearID ASC")
+```
+
+
+
+## Question: How much did Derek Jeter (playerID=jeterde01) make throughout his career?
+
+
+```{r}
+sqldf("SELECT yearID, salary FROM Salaries where playerID=\"jeterde01\"")
+```
+
+## Question: How many players were born in the 80s?
+
+```{r}
+sqldf("SELECT COUNT(*) from Master WHERE birthYear >= 1980 AND birthYear <= 1989")
+```
+
+
+
+# Medium Questions
+
+## Questions: What are the top 5 the most popular birth states in the USA?
+
+```{r}
+sqldf("select birthState, count(*) as stateCount FROM Master WHERE birthCountry=\"USA\" GROUP BY birthState ORDER BY stateCount DESC limit 5")
+```
+
+## Question: What is the average salary for each birth year?
+
+```{r}
+sqldf("SELECT Master.birthYear, count(*) as NumPlayers, AVG(Salaries.salary) FROM Salaries JOIN Master ON Salaries.playerID = Master.playerID  GROUP BY Master.birthYear ORDER BY Master.birthYear ASC")
+```
+
+
+
+
+## Question: Who has the highest average salary throughout their career?
+
+```{r}
+sqldf("select playerID, count(*) as num, avg(salary) as avgSalary from Salaries group by playerID order by avgSalary desc")
+```
+
+
+
+
+
+# Hard Questions
+
+## Question: Which player, and who did he play for, had the lowest salary in 1994?
+
+```{r}
+sqldf("select Master.nameGiven, Master.playerID, Salaries.salary, Salaries.yearID, Salaries.teamID FROM Salaries JOIN Master ON Salaries.playerID = Master.playerID WHERE Salaries.yearID = 1994 ORDER BY Salaries.salary limit 10")
+```
+
+
+## Question: 
+
+TODO: bring in another table.
+
