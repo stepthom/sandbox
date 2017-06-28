@@ -7,6 +7,13 @@ title: "SQL Challenge"
 library(tidyverse)
 library(sqldf)
 library(Lahman)
+colnames(Master)
+
+
+
+ colnames(Salaries)
+ 
+ head(Master, n=10)
 ```
 
 
@@ -14,11 +21,11 @@ library(Lahman)
 
 
 ```{r}
-sqldf("select * from Master limit 10")
+colnames(Master)
 ```
 
 ```{r}
-sqldf("select * from Salaries limit 10")
+sqldf("select * from Master limit 10")
 ```
 
 
@@ -104,5 +111,4 @@ sqldf("select Master.nameGiven, Master.playerID, Salaries.salary, Salaries.yearI
 
 ## Question: 
 
-TODO: bring in another table.
 
