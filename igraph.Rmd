@@ -1,0 +1,463 @@
+---
+  title: "Social Network Analysis with igraph"
+---
+
+This tutorial was motivated by:
+
+NetSciX School of Code Workshop
+Network analysis with R and igraph
+Wroclaw, Poland, January 10 2016
+
+Katya Ognyanova, katya@ognyanova.net
+www.kateto.net/netscix2016
+
+
+```{r,eval=FALSE}
+library(igraph)
+library(igraphdata)
+````
+
+
+# Networks in igraph
+
+```{r}
+g1 <- graph( edges=c(1,2, 2,3, 3,1), n=3, directed=F ) # an undirected graph with 3 edges
+# The numbers are interpreted as vertex IDs, so the edges are 1-->2, 2-->3, 3-->1
+plot(g1) # A simple plot of the network - we'll talk more about plots later
+class(g1)
+g1
+```
+
+```{r}
+g2 <- graph( edges=c(1,2, 2,3, 3,1), n=10 ) # now with 10 vertices, and directed by default
+plot(g2)   
+g2
+```
+
+
+
+```{r}
+g3 <- graph( c("John", "Jim", "Jim", "Jill", "Jill", "John")) # named vertices
+# When the edge list has vertex names, the number of nodes is not needed
+plot(g3)
+g3
+```
+
+```{r}
+g4 <- graph( c("John", "Jim", "Jim", "Jack", "Jim", "Jack", "John", "John"), 
+             isolates=c("Jesse", "Janis", "Jennifer", "Justin") )  
+```
+
+
+In named graphs we can specify isolates by providing a list of their names.
+
+```{r}
+plot(g4, edge.arrow.size=.5, vertex.color="gold", vertex.size=15, 
+     vertex.frame.color="gray", vertex.label.color="black", 
+     vertex.label.cex=1.5, vertex.label.dist=2, edge.curved=0.2) 
+```
+
+
+Small graphs can also be generated with a description of this kind:
+'-' for undirected tie, "+-' or "-+" for directed ties pointing left & right, 
+"++" for a symmetric tie, and ":" for sets of vertices
+
+```{r}
+plot(graph_from_literal(a---b, b---c)) # the number of dashes doesn't matter
+plot(graph_from_literal(a--+b, b+--c))
+plot(graph_from_literal(a+-+b, b+-+c)) 
+plot(graph_from_literal(a:b:c---c:d:e))
+
+gl <- graph_from_literal(a-b-c-d-e-f, a-g-h-b, h-e:f:i, j)
+plot(gl)
+```
+
+
+## Edge, vertex, and network attributes
+
+Access vertices and edges:
+
+```{r}
+E(g4) # The edges of the object
+V(g4) # The vertices of the object
+```
+
+You can also manipulate the network matrix directly:
+
+```{r}
+g4[]
+g4[1,]
+g4[3,3] <- 10
+g4[5,7] <- 10
+```
+
+Add attributes to the network, vertices, or edges:
+
+```{r}
+V(g4)$name # automatically generated when we created the network.
+V(g4)$gender <- c("male", "male", "male", "male", "female", "female", "male")
+E(g4)$type <- "email" # Edge attribute, assign "email" to all edges
+E(g4)$weight <- 10    # Edge weight, setting all existing edges to 10
+```
+
+Examine attributes
+
+```{r}
+edge_attr(g4)
+vertex_attr(g4)
+graph_attr(g4)
+```
+
+Another way to set attributes
+(you can similarly use set_edge_attr(), set_vertex_attr(), etc.)
+
+```{r}
+g4 <- set_graph_attr(g4, "name", "Email Network")
+g4 <- set_graph_attr(g4, "something", "A thing")
+
+graph_attr_names(g4)
+graph_attr(g4, "name")
+graph_attr(g4)
+
+g4 <- delete_graph_attr(g4, "something")
+graph_attr(g4)
+```
+
+```{r}
+plot(g4, edge.arrow.size=.5, vertex.label.color="black", vertex.label.dist=1.5,
+     vertex.color=c( "pink", "skyblue")[1+(V(g4)$gender=="male")] ) 
+```
+
+g4 has two edges going from Jim to Jack, and a loop from John to himself.
+We can simplify our graph to remove loops & multiple edges between the same nodes.
+Use 'edge.attr.comb' to indicate how edge attributes are to be combined - possible 
+options include "sum", "mean", "prod" (product), min, max, first/last (selects 
+the first/last edge's attribute). Option "ignore" says the attribute should be 
+disregarded and dropped.
+
+```{r}
+g4s <- simplify( g4, remove.multiple = T, remove.loops = F, 
+                 edge.attr.comb=list(weight="sum", type="ignore") )
+plot(g4s, vertex.label.dist=1.5)
+g4s
+```
+
+Let's take a look at the description of the igraph object.
+Those will typically start with up to four letters:
+1. D or U, for a directed or undirected graph
+2. N for a named graph (where nodes have a name attribute)
+3. W for a weighted graph (where edges have a weight attribute)
+4. B for a bipartite (two-mode) graph (where nodes have a type attribute)
+
+The two numbers that follow refer to the number of nodes and edges in the graph. 
+The description also lists graph, node & edge attributes, for example:
+(g/c) - graph-level character attribute
+(v/c) - vertex-level character attribute
+(e/n) - edge-level numeric attribute
+
+
+## Specific graphs and graph models
+
+### Empty graph
+
+```{r}
+eg <- make_empty_graph(40)
+plot(eg, vertex.size=10, vertex.label=NA)
+```
+
+### Full graph
+
+```{r}
+fg <- make_full_graph(40)
+plot(fg, vertex.size=10, vertex.label=NA)
+```
+
+### Star graph 
+
+```{r}
+st <- make_star(40)
+plot(st, vertex.size=10, vertex.label=NA) 
+```
+
+### Tree graph
+
+
+```{r}
+tr <- make_tree(40, children = 3, mode = "undirected")
+plot(tr, vertex.size=10, vertex.label=NA) 
+```
+
+### Ring graph
+
+
+```{r}
+rn <- make_ring(40)
+plot(rn, vertex.size=10, vertex.label=NA)
+```
+
+### Erdos-Renyi random graph 
+
+('n' is number of nodes, 'm' is the number of edges)
+
+```{r}
+er <- sample_gnm(n=100, m=40) 
+plot(er, vertex.size=6, vertex.label=NA)  
+```
+
+### Watts-Strogatz small-world graph
+Creates a lattice with 'dim' dimensions of 'size' nodes each, and rewires edges 
+randomly with probability 'p'. You can allow 'loops' and 'multiple' edges.
+The neighborhood in which edges are connected is 'nei'.
+
+```{r}
+sw <- sample_smallworld(dim=2, size=10, nei=1, p=0.1)
+plot(sw, vertex.size=6, vertex.label=NA, layout=layout_in_circle)
+```
+ 
+### Barabasi-Albert preferential attachment model for scale-free graphs
+'n' is number of nodes, 'power' is the power of attachment (1 is linear)
+'m' is the number of edges added on each time step 
+
+```{r}
+ ba <-  sample_pa(n=100, power=1, m=1,  directed=F)
+ plot(ba, vertex.size=6, vertex.label=NA)
+```
+
+
+# Case Study: The Karate Club
+ 
+Let's study the Zachary Karate Club. This is a social network between members of a university karate club, led by president John A. and karate instructor Mr. Hi (pseudonyms).
+
+The edge weights are the number of common activities the club members took part of. These
+activities were:
+1. Association in and between academic classes at the university.
+2. Membership in Mr. Hi’s private karate studio on the east side of the city where Mr. Hi taught
+nights as a part-time instructor.
+3. Membership in Mr. Hi’s private karate studio on the east side of the city, where many of his
+supporters worked out on weekends.
+4. Student teaching at the east-side karate studio referred to in (2). This is different from (2)
+in that student teachers interacted with each other, but were prohibited from interacting with
+their students.
+5. Interaction at the university rathskeller, located in the same basement as the karate club’s
+workout area.
+6. Interaction at a student-oriented bar located across the street from the university campus.
+7. Attendance at open karate tournaments held through the area at private karate studios.
+8. Attendance at intercollegiate karate tournaments held at local universities. Since both open
+and intercollegiate tournaments were held on Saturdays, attendance at both was impossible.
+
+
+Zachary studied conflict and fission in this network, as the karate club was split into two separate
+clubs, after long disputes between two factions of the club, one led by John A., the other by Mr. Hi.
+The ‘Faction’ vertex attribute gives the faction memberships of the actors. After the split of the
+club, club members chose their new clubs based on their factions, except actor no. 9, who was in
+John A.’s faction but chose Mr. Hi’s club.
+
+
+```{r}
+g <- graph.ring(10,directed=TRUE)               
+plot(g)
+ShortPth <- get.shortest.paths(g, 8, 2)    # List of path 8->2
+ShortPth
+E(g)$color <- "SkyBlue2"
+E(g)$width <- 1
+E(g, path=ShortPth$vpath[[1]])$color <- "red" 
+
+### setting edges by path= is failing !!!!!!!!!!
+plot(g)
+
+```
+
+```{r}
+data("karate")
+karate
+summary(karate)
+head(karate)
+karate[1,]
+
+l <- layout_with_fr(karate)
+plot(karate, vertex.size=17, edge.width=2, layout=l)
+```
+
+```{r}
+deg <- degree(karate, mode="all")
+deg
+
+
+centr_clo(karate, mode="all", normalized=T) 
+
+
+centr_betw(karate, directed=T, normalized=T)
+
+hist(deg, breaks=1:vcount(karate)-1, main="Histogram of node degree")
+
+plot(karate, vertex.size=deg*2)
+```
+ 
+## Rewiring a graph
+
+'each_edge()' is a rewiring method that changes the edge endpoints
+uniformly randomly with a probability 'prob'.
+
+```{r}
+ rn.rewired <- rewire(rn, each_edge(prob=0.1))
+ plot(rn.rewired, vertex.size=10, vertex.label=NA)
+ 
+ # Rewire to connect vertices to other vertices at a certain distance. 
+ rn.neigh = connect.neighborhood(rn, 5)
+ plot(rn.neigh, vertex.size=8, vertex.label=NA) 
+ 
+ 
+ # Combine graphs (disjoint union, assuming separate vertex sets): %du%
+ plot(rn, vertex.size=10, vertex.label=NA) 
+ plot(tr, vertex.size=10, vertex.label=NA) 
+ plot(rn %du% tr, vertex.size=10, vertex.label=NA) 
+```
+
+  
+ 
+# ================ 3. Reading network data from files ================
+
+Set the working directory to the folder containing the workshop files:
+
+```{r}
+setwd("~/sandbox/NetSciX Workshop")  
+```
+
+
+## DATASET 1: edgelist 
+
+```{r}
+nodes <- read.csv("Dataset1-Media-Example-NODES.csv", header=T, as.is=T)
+links <- read.csv("Dataset1-Media-Example-EDGES.csv", header=T, as.is=T)
+```
+
+Examine the data:
+
+```{r}
+head(nodes)
+head(links)
+nrow(nodes); length(unique(nodes$id))
+nrow(links); nrow(unique(links[,c("from", "to")]))
+```
+
+Collapse multiple links of the same type between the same two nodes
+by summing their weights, using aggregate() by "from", "to", & "type":
+(we don't use "simplify()" here so as not to collapse different link types)
+
+```{r}
+links <- aggregate(links[,3], links[,-3], sum)
+links <- links[order(links$from, links$to),]
+colnames(links)[4] <- "weight"
+rownames(links) <- NULL
+```
+
+
+## DATASET 2: matrix 
+
+
+```{r}
+nodes2 <- read.csv("Dataset2-Media-User-Example-NODES.csv", header=T, as.is=T)
+links2 <- read.csv("Dataset2-Media-User-Example-EDGES.csv", header=T, row.names=1)
+```
+
+Examine the data:
+
+```{r}
+head(nodes2)
+head(links2)
+
+links2 is an adjacency matrix for a two-mode network:
+links2 <- as.matrix(links2)
+dim(links2)
+dim(nodes2)
+```
+
+
+# Turning networks into igraph objects
+ 
+
+
+## DATASET 1
+
+Converting the data to an igraph object:
+The graph.data.frame function, which takes two data frames: 'd' and 'vertices'.
+'d' describes the edges of the network - it should start with two columns 
+containing the source and target node IDs for each network tie.
+'vertices' should start with a column of node IDs.
+Any additional columns in either data frame are interpreted as attributes.
+
+```{r}
+net <- graph_from_data_frame(d=links, vertices=nodes, directed=T) 
+```
+
+Examine the resulting object:
+
+```{r}
+class(net)
+net 
+```
+
+ We can look at the nodes, edges, and their attributes:
+ 
+```{r}
+E(net)
+V(net)
+E(net)$type
+V(net)$media
+```
+
+
+```{r}
+plot(net, edge.arrow.size=.4,vertex.label=NA)
+```
+
+Removing loops from the graph:
+
+```{r}
+net <- simplify(net, remove.multiple = F, remove.loops = T) 
+```
+
+If you need them, you can extract an edge list or a matrix from igraph networks.
+
+```{r}
+as_edgelist(net, names=T)
+as_adjacency_matrix(net, attr="weight")
+
+# Or data frames describing nodes and edges:
+as_data_frame(net, what="edges")
+as_data_frame(net, what="vertices")
+```
+
+## DATASET 2
+
+```{r}
+head(nodes2)
+head(links2)
+
+net2 <- graph_from_incidence_matrix(links2)
+
+# A built-in vertex attribute 'type' shows which mode vertices belong to.
+table(V(net2)$type)
+
+plot(net2,vertex.label=NA)
+
+# To transform a one-mode network matrix into an igraph object,
+# use graph_from_adjacency_matrix()
+
+# We can also easily generate bipartite projections for the two-mode network:
+# (co-memberships are easy to calculate by multiplying the network matrix by
+# its transposed matrix, or using igraph's bipartite.projection function)
+
+net2.bp <- bipartite.projection(net2)
+
+# We can calculate the projections manually as well:
+#   as_incidence_matrix(net2)  %*% t(as_incidence_matrix(net2))
+# t(as_incidence_matrix(net2)) %*%   as_incidence_matrix(net2)
+
+plot(net2.bp$proj1, vertex.label.color="black", vertex.label.dist=1,
+     vertex.label=nodes2$media[!is.na(nodes2$media.type)])
+
+plot(net2.bp$proj2, vertex.label.color="black", vertex.label.dist=1,
+     vertex.label=nodes2$media[ is.na(nodes2$media.type)])
+```
+
