@@ -18,25 +18,38 @@ The data is built-in to the `recommenderlab` pacakge.
 ```{r}
 data(MovieLense)
 r <- MovieLense
+```
 
-# Inspect the class and structure of r, just for fun
+
+Inspect the class and structure of `r`, just for giggles.
+
+```{r}
 class(r)
 str(r)
+```
 
 
-# Look at the first few rows. Need to turn it into a data frame first, because
-head(as(r, "data.frame"), n=20)
+Create a copy of the data as a dataframe, to make some exploration a bit easier.
+
+```{r}
+df = as(r, "data.frame")
+```
+
+Look at the first few rows.
+
+```{r}
+head(df, n=20)
 ```
  
  
 # Explore and Visualize
 
-First, convert to a dataframe:
 
 ```{r}
-df = as(r, "data.frame")
 str(df)
+colnames(df)
 dim(df)
+summary(df)
 ```
 
 Let's look at the rating distribution:
@@ -103,7 +116,6 @@ There are a couple of different algorithms in the package:
 - IBCF: Item-based collaborative filtering
 
 Let's build one of each.
-
 
 ```{r}
 rec.ubcf <- Recommender(r, "UBCF", param=list(normalize="Z-score", method="Cosine"))
