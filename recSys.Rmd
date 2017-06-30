@@ -185,7 +185,7 @@ buildAndEvaluateModel = function(ratings, model_name, normalize, method) {
 }
 ```
 
-Now, let's define a nunch of combinations.
+Now, let's define a bunch of combinations.
 
 ```{r}
 model_names = c("UBCF", "IBCF")
