@@ -70,23 +70,30 @@ Clean up some of that English!
 
 # Feature Engineering
 
+
+Tidy up the text.
+
 ```{r}
 text_df <- df %>%
   select(id, status, en) %>%
   unnest_tokens(word, en)
+```
 
+Look at ngrams.
 
+```{r}
   #unnest_tokens(ngram, en, token="ngrams", n=1)
+```
 
 # Remove stopwords
-custom_stop_words = data.frame(word=c("br", "h4"))
+
+```{r}
+custom_stop_words = data.frame(word=c("br", "h4", "loan", "business", "font", "times"))
 
 text_df <- text_df %>%
   anti_join(stop_words, by=c("word"="word")) %>%
   anti_join(custom_stop_words, by=c("word"="word")) %>%
   arrange(id)
-
-head(text_df)
 ```
 
 TODO: more stop words
@@ -95,7 +102,50 @@ TODO: more cleaning
 
 
 ```{r}
-text_df %>%
+head(text_df)
+```
+
+Count the top words.
+
+```{r}
+text_df %>% group_by(word) %>%
+  summarize(count=n()) %>%
+  mutate(freq = count / sum(count)) %>%
+  arrange(desc(count))
+```
+
+
+Count the top words by status.
+
+```{r}
+top_word = text_df %>% group_by(status, word) %>%
+  summarize(count=n()) %>%
+  mutate(freq = count / sum(count)) %>%
+  arrange(desc(count))
+
+top_word
+```
+
+Calculate the log ratio:
+
+```{r}
+TODO
+top_word %>%
+  spread(word, count) 
+```
+
+%>%
+  filter(topic1 > .001 | topic2 > .001) %>%
+  mutate(log_ratio = log2(topic2 / topic1))
+
+
+```{r}
+c = text_df %>%
+  group_by(id, word) %>%
+  summarize(count = n())
+
+c
+
   count(word, sort = TRUE)
 ```
 
@@ -107,15 +157,18 @@ text_df %>%
 
 ## Latent Dirichlet Allocation
 
-```{}
-ap_lda <- LDA(AssociatedPress, k = 2, control = list(seed = 1234))
-ap_lda
-
-```
 
 ```{r}
-library(ggplot2)
-library(dplyr)
+
+c
+
+a = c %>%
+  cast_dtm(id, word, count)
+
+a
+
+ap_lda <- LDA(a, k = 20, control = list(seed = 1234))
+ap_lda
 
 ap_topics <- tidy(ap_lda, matrix = "beta")
 ap_topics
@@ -125,15 +178,30 @@ ap_top_terms <- ap_topics %>%
   top_n(10, beta) %>%
   ungroup() %>%
   arrange(topic, -beta)
+```
 
+
+```{r,fig.width=10,fig.height=11}
 ap_top_terms %>%
   mutate(term = reorder(term, beta)) %>%
   ggplot(aes(term, beta, fill = factor(topic))) +
   geom_col(show.legend = FALSE) +
-  facet_wrap(~ topic, scales = "free") +
+  facet_wrap(~ topic, scales = "free", ncol=3) +
   coord_flip()
+```
+
+
+```{r}
+beta_spread <- ap_topics %>%
+  mutate(topic = paste0("topic", topic)) %>%
+  spread(topic, beta) %>%
+  filter(topic1 > .001 | topic2 > .001) %>%
+  mutate(log_ratio = log2(topic2 / topic1))
+
+beta_spread
 
 ```
+
 
 
 
@@ -324,4 +392,5 @@ After digesting the above decision tree, answer the following questions.
  
 - Using the decision tree model, what would be the most likely fate for the following passenger?
 ID=891, Pclass=3, Name=Mr. Patrick Dooley, Sex=male, Age=32, Sibsp=0, Parch=0, TicketNumber=370376, Fare=7.75, Cabin=N/A, Embarked=Q, Title=Mr, Fsize=1, Child=Adult, Mother=NotMother
+
 
