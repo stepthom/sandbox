@@ -1,0 +1,229 @@
+---
+title: "Classification Case Study: Kiva Loans"
+output: html_document
+author: "Stephen W. Thomas"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r message=FALSE}
+library(tidyverse)
+library(scales)
+library(titanic)
+library(rpart)
+library(rpart.plot)
+library(RColorBrewer)
+library(MLmetrics)
+```
+
+
+# Introduction
+
+TODO
+
+
+## Learning Objectives
+
+- Understand and interpret the results of a decision tree classifier model.
+- Use a decision tree classifier model to predict new data instances.
+- Determine if text helps classification results.
+- Learn who pays back loans, and who doesn't.
+
+# Loading the Data
+
+TODO
+
+
+```{r}
+df <- read_csv("kiva.csv")
+```
+
+
+
+A good idea when performing any data analytics activity is to spend time looking at some of the raw data. 
+
+```{r}
+str(df)
+df$status = as.factor(df$status)
+df$sector = as.factor(df$sector)
+df$country = as.factor(df$country)
+df$gender = as.factor(df$gender)
+df$nonpayment = as.factor(df$nonpayment)
+str(df)
+head(df, n=20)
+```
+
+# Data Cleaning
+
+Clean up some of that English!
+
+```{r}
+
+```
+
+
+# Feature Engineering
+
+
+
+# Descriptive Statistics
+
+It’s always a good idea to get familiar with the data by understanding the variables. How many are there, what are their types, are there any special notes? Let’s do just that.
+ 
+The dataset contains the following 12 variables for each passenger. 
+
+
+## Variable: sector
+
+Below is a cross tabulation for the variables sector (rows) and status (columns), along with sums of each row and column.
+
+```{r}
+addmargins(table(df$sector, df$status, dnn=c("sector", "status")))
+```
+ 
+The tables shows us that, for example, TODO
+ 
+Below is a graphical representation of the same tabulation, color-coded by those who survived (blue, bottom) and those who did not (orange, top):
+
+```{r}
+qplot(sector, data=df, geom="bar", fill=status, xlab="sector")+
+  theme(axis.text.x = element_text(angle = 90, hjust = 1)) 
+```
+
+
+
+
+# Building a Classifier Model
+
+Now that we have explored the data, it’s time to dive deeper. Which variable(s) are the biggest predictors of survival? Is it age, pclass, mother? All three variables seem to play a role, but we don’t yet know which are the most important. This is where classifier models shine. They can tell us exactly how all the variables relate to each other, and which are most important.
+ 
+A decision tree is a popular classifier model in analytics. Here, the decision tree is automatically created by a machine learning algorithm as it learns simple decision rules from the data. These automatically-learned rules can then be used to both understand the variables and to predict future data. A big advantage of decision trees over other classifier models is that they are relatively simple for humans to understand and interpret.
+ 
+A decision tree consists of nodes. Each node splits the data according to a rule. A rule is based on a variable in the data. For example, a rule might be “Age greater than 30.” In this case, the node splits the data by the age variable; those passengers that satisfy the rule (i.e., are greater than 30) follow the left path out of the node; the rest follow the right path out of the node. In this way, paths from the root node down to leaf nodes are created, describing the fate of certain types of passengers.
+ 
+A decision tree path always starts with a root node (node number 1), which contains the most important splitting rule. Each subsequent node contains the next most important rule. After the decision tree is automatically created by the machine learning algorithm, one can use the decision tree to classify an individual by simply following a path: start at the root node and apply each rule to follow the appropriate path until you hit an end.
+ 
+When creating a decision tree from data, the analyst can specify the number of nodes for the machine learning algorithm to create. More nodes leads to a more accurate model, at the cost of a more complicated and harder-to-interpret model. Likewise, fewer nodes usually leads to a less accurate model, but the model is easier to understand and interpret. 
+ 
+First thing's first, let's split the data into training and testing.
+
+```{r}
+set.seed(123)
+train <- sample_frac(df, 0.8)
+test <- setdiff(df, train)
+```
+
+Let's create the model. Let's shoot for fewer nodes, and therefore a simpler and less accurate model. Later, we'll look at a decision tree with more nodes. 
+
+```{r}
+form = as.formula(Survived ~ Pclass + Sex + Age + Fare + Embarked + Fsize + Child + Mother)
+tree <- rpart(form, train, method="class")
+```
+
+
+The textual rendering contains the node number, the rule, the number of rows that matched this rule, the deviance of this rule, and finally, the probability of survival at this node.
+
+```{r}
+tree
+```
+
+
+```{r}
+printcp(tree)
+```
+
+Let's look at a graphical rendering of the decision tree.
+
+```{r}
+rpart.plot(tree, extra=2)
+```
+
+Let's use the classifier to predict the class of the testing data.
+
+
+```{r}
+predicted = predict(tree, test, type="class")
+```
+
+Let's look at the confusion matrix.
+
+```{r}
+actual = test$Survived
+table(actual, predicted)
+```
+
+Let's check the accuracy and other metrics of the classifier on the testing data.
+
+```{r}
+print(sprintf("Accuracy:    %.3f", Accuracy(y_true=actual, y_pred=predicted)))
+print(sprintf("AUC:         %.3f", AUC(y_true=actual, y_pred=predicted)))
+print(sprintf("Precision:   %.3f", Precision(y_true=actual, y_pred=predicted)))
+print(sprintf("Recall:      %.3f", Recall(y_true=actual, y_pred=predicted)))
+print(sprintf("F1 Score:    %.3f", F1_Score(predicted, actual)))
+print(sprintf("Sensitivity: %.3f", Sensitivity(y_true=actual, y_pred=predicted)))
+print(sprintf("Specificity: %.3f", Specificity(y_true=predicted, y_pred=actual)))
+```
+
+
+# The Challenge
+
+Now, see if you (yes, you!) can improve those metrics. Some ideas:
+
+- Perform additional data cleaning
+- Perform additional feature engineering
+- Try different parameters for the rpart decision tree (see rpart's help for more details)
+- Try different packages for decisions trees (e.g., party, caret)
+- Try different classifier algorithms (Naive Bayes, SVM, NN, ...)
+- Try ensemble methods: Random Forests, bagging, boosting
+
+
+```{r}
+# TODO: Insert your magic here!
+```
+ 
+# Questions
+
+After digesting the above decision tree, answer the following questions.
+ 
+- What is the most important variable in the decision tree? That is, which is the most important variable for predicting survival?
+ 
+- Which path in the tree has the highest probability of survival?
+ 
+- Which paths in the tree have the lowest probability of survival?
+ 
+- What would be the chances of survival of a third class female?
+ 
+- Of all third class females, what is the effect of ticket fares?
+ 
+- Of males that are younger than 6.5 years old, which variable most predicted their fate?
+ 
+- Which path is taken by the most passengers?
+ 
+- Using the decision tree model, what would be the most likely fate for the following passenger?
+ID=891, Pclass=3, Name=Mr. Patrick Dooley, Sex=male, Age=32, Sibsp=0, Parch=0, TicketNumber=370376, Fare=7.75, Cabin=N/A, Embarked=Q, Title=Mr, Fsize=1, Child=Adult, Mother=NotMother
+
+
+# Appendix A: Frequently Asked Questions
+
+#### For females of the third class, why do higher fares mean a smaller chance of survival? Isn’t this counter-intuitive?
+ 
+Yes, it is counter-intuitive. I have dug into the data a little bit. One thing that I found is that for the 27 third-class females whose fare was >= 23 pounds, most belonged to one of only five families. It might be that case that families tended to perish together for some tragic, unknowable reason.
+ 
+#### For those over age 25, the mean number of spouses/siblings is about 0.34. This seems a little low, does it not?
+ 
+One possible explanation is the overwhelming "Third Class Bias," as it is called. Many third class passengers travelled alone, or some with friends, which is not under the umbrella of the sibsp definition.  Also, many third classers were immigrating to the US. They were married, but were sent off alone to establish a foothold and then later sent for their spouses.
+ 
+#### For those under age 14 the mean number parents/children is 1.37. This seems a bit low.
+
+Not all children travelled with their parents, especially in third class.  Some children travelled with older siblings, nannies, aunts/uncles, etc.  Actually, more often than not, children travelled with only one parent. After further investigation. Here are a few unusual passenger cases that came up:
+
+- Case #1:  Emanuel, Miss. Virginia Ethel. 3d Class. Age 5. sibsp/parch=0/0
+    - Boarded with her nurse Miss. Elizabeth Dowdell. Escorted her to grandparents' home in New York, NY.
+- Case #2:  Hassan, Mr. Houssein G N. 3d Class. Age 11. s/p=0/0
+    - Traveled with family friend Mr. Nassef Cassem Albimona. Going to visit his parents in America from Lebanon. (Interesting note: Albimona was from Fredericksburg, VA)
+- Case #3:  Ayoub, Miss. Banoura. 3d Class. Age 13. s/p=0/0
+    - Boarded with 5 cousins. Travelling to Detroit, MI to be reunited with family.
+- Case #4:  Nasser, Mrs. Nicholas Nasser. 2nd Class. Age 14. s/p=1/0
+    - Married to a 32 year old man... sibsp stands for spouse rather than sibling... unusual at such a young age. She lied when she boarded the Titanic and claimed she was 18. However, her birth certificate proves that on April 15, 1912 she was 14, not 18!

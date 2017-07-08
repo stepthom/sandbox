@@ -1,0 +1,77 @@
+---
+title: "Peyton Manning vs. Tom Brady"
+---
+
+
+
+```{r}
+library(tidytext)
+library(RSentiment)
+library(cleanNLP)
+library(tidyr)
+library(dplyr)
+library(ggplot2)
+library(readr)
+library(lubridate)
+library(stringr)
+```
+
+
+```{r}
+tweets_manning<- read_csv("manning.csv")
+tweets_manning
+
+# Example input: "Thu Oct 02 15:38:29 +0000 2014"
+# Desired output: A libridate object: "2014-10-02 15:38:29 UTC"
+configDate = function(x) {
+  tmp = strsplit(x, "\\s+")[[1]]
+  paste(tmp[2], tmp[3], tmp[6])
+  as.Date(paste(tmp[2], tmp[3], tmp[6], tmp[4]), "%b %d %Y")
+  #mdy_hms(new)
+}
+
+tweets_manning<- read_csv("manning.csv")
+tweets_brady <- read_csv("brady.csv")
+tweets <- bind_rows(tweets_manning %>% 
+                      mutate(person = "Manning")
+                    
+                    ,
+                    tweets_brady %>% 
+                      mutate(person = "Brady"))
+
+
+
+tweets$timestamp = 0
+for (i in 1:nrow(tweets)){
+  tweets[i,]$timestamp = configDate(tweets[i,]$time)
+}
+
+tweets$timestamp = lapply(tweets$time, configDate)
+str(tweets)
+summary(tweets)
+head(tweets)
+
+write_csv(tweets, "alltweets.csv")
+
+tweets2 = tweets %>% mutate(timestamp2 = )
+
+
+library(scales)
+ggplot(tweets, aes(x = as.Date(timestamp), fill = person)) +
+  geom_histogram(position = "identity", bins = 30, show.legend = FALSE) +
+  facet_wrap(~person, ncol = 1, scales = "free_y") + 
+  scale_x_date(labels = date_format("%m-%Y"))
+```
+
+```{r}
+replace_reg <- "https://t.co/[A-Za-z\\d]+|http://[A-Za-z\\d]+|&amp;|&lt;|&gt;|RT|https"
+unnest_reg <- "([^A-Za-z_\\d#@']|'(?![A-Za-z_\\d#@]))"
+tidy_tweets <- tweets %>% 
+  filter(!str_detect(text, "^RT")) %>%
+  mutate(text = str_replace_all(text, replace_reg, "")) %>%
+  unnest_tokens(word, text, token = "regex", pattern = unnest_reg) %>%
+  filter(!word %in% stop_words$word,
+         str_detect(word, "[a-z]"))
+
+tidy_tweets
+```
