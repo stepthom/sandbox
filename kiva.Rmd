@@ -74,6 +74,15 @@ Clean up some of that English!
 Tidy up the text.
 
 ```{r}
+# Remove HTML tags
+library(stringr)
+
+df %>% strings %>% str_replace("<.*>", "")
+```
+
+
+```{r}
+
 text_df <- df %>%
   select(id, status, en) %>%
   unnest_tokens(word, en)
@@ -88,7 +97,7 @@ Look at ngrams.
 # Remove stopwords
 
 ```{r}
-custom_stop_words = data.frame(word=c("br", "h4", "loan", "business", "font", "times"))
+custom_stop_words = data.frame(word=c("br", "h4", "loan", "business", "font", "times", "span"))
 
 text_df <- text_df %>%
   anti_join(stop_words, by=c("word"="word")) %>%
@@ -144,9 +153,8 @@ c = text_df %>%
   group_by(id, word) %>%
   summarize(count = n())
 
-c
+# c %>% arrange(desc(count))
 
-  count(word, sort = TRUE)
 ```
 
 ```{r}
@@ -162,14 +170,45 @@ text_df %>%
 
 c
 
-a = c %>%
-  cast_dtm(id, word, count)
-
+a = c %>% cast_dtm(id, word, count)
 a
+str(a)
+library(tm)
+dtm2.sparse <- removeSparseTerms(a, 0.9995)
+dtm2.sparse
 
-ap_lda <- LDA(a, k = 20, control = list(seed = 1234))
+rowTotals <- apply(dtm2.sparse , 1, sum) #Find the sum of words in each Document
+which(rowTotals==0)
+dtm.new   <- dtm2.sparse[rowTotals> 0, ] 
+dtm.new
+
+ap_lda <- LDA(dtm.new, k = 10, control = list(seed = 1234))
 ap_lda
+```
 
+Add the resulting document topic probabilities to the `df` dataframe.
+
+```{r}
+
+readr::write_csv(tidy(ap_lda, "beta"), "beta.csv")
+
+readr::write_csv(tidy(ap_lda, "gamma"), "gamma.csv")
+
+ap_documents <- tidy(ap_lda, matrix = "gamma")
+
+ap_documents
+
+ap_documents = ap_documents %>% spread(topic, gamma)
+ap_documents$document = as.integer(ap_documents$document)
+
+
+df  = df %>%
+  left_join(ap_documents, by=c("id" = "document"))
+df
+```
+
+
+```{r}
 ap_topics <- tidy(ap_lda, matrix = "beta")
 ap_topics
 
@@ -320,7 +359,8 @@ test <- setdiff(df, train)
 Let's create the model. Let's shoot for fewer nodes, and therefore a simpler and less accurate model. Later, we'll look at a decision tree with more nodes. 
 
 ```{r}
-form = as.formula(status ~ sector + country + gender + loan_amount + nonpayment)
+colnames(df)
+form = as.formula(status ~ sector + country + gender + loan_amount + nonpayment + `1.y` + `2.y` + `3.y` + `4` + `5` + `6` + `7` + `8` + `9` + `10`)
 tree <- rpart(form, train, method="class")
 ```
 
@@ -392,5 +432,4 @@ After digesting the above decision tree, answer the following questions.
  
 - Using the decision tree model, what would be the most likely fate for the following passenger?
 ID=891, Pclass=3, Name=Mr. Patrick Dooley, Sex=male, Age=32, Sibsp=0, Parch=0, TicketNumber=370376, Fare=7.75, Cabin=N/A, Embarked=Q, Title=Mr, Fsize=1, Child=Adult, Mother=NotMother
-
 

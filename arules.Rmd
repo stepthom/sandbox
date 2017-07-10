@@ -7,6 +7,9 @@ output:
 
 ```{r}
 library(arules)
+data("Groceries")
+inspect(Groceries[1:20,])
+
 library(arulesViz)
 ```
 
@@ -22,8 +25,14 @@ data("Groceries")
 str(Groceries)
 dim(Groceries)
 summary(Groceries)
-inspect(Groceries[1:10,])
+```
 
+
+```{r}
+inspect(Groceries[1:20,])
+```
+
+```{r}
 # Which items contain the word fish?
 colnames(Groceries)[grep("fish", colnames(Groceries))]
 
@@ -35,8 +44,8 @@ colnames(Groceries)[grep("wine", colnames(Groceries))]
 ```{r}
 itemFrequencyPlot(Groceries,
                   type="relative",
-                  topN=10, # can be changed to the number of interest
-                  horiz=TRUE,
+                  topN=15, # can be changed to the number of interest
+                  horiz=FALSE,
                   col='steelblue3',
                   xlab='',
                   main='Item frequency, relative')
