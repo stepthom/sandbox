@@ -1,14 +1,20 @@
 ---
 title: "Classification Case Study: Kiva Loans"
-output: html_document
+output: 
+  html_document: 
+    code_folding: hide
+    toc: true
+    toc_depth: 2
+    number_sections: true
+    theme: journal
 author: "Stephen W. Thomas"
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(echo = FALSE, warning=FALSE, message=FALSE)
 ```
 
-```{r message=FALSE}
+```{r}
 library(tidyverse)
 library(scales)
 library(titanic)
@@ -23,30 +29,34 @@ library(tidytext)
 
 # Introduction
 
-TODO
+Kiva Microfunds is a non-profit that allows people to lend money to low0income entrepreneurs and students around the world. Started in 2005, Kiva has crowd-funded millions of loans with a repayment rate of 98% to 99%.
+
+In additional to traditional demographic data, Kiva includes personal stories on each loan seaker because they want their leanders to connect with their entreprenuers on a human level.
+
+In this case study, we will build a prediction model (in particular, a decision tree classifier) to predict who will pay back loans, and who will default. A key question we want to ask is: does adding text (i.e., the personal stories) to the model increase its prediction power?
 
 
-## Learning Objectives
+# Discussion Questions
 
-- Understand and interpret the results of a decision tree classifier model.
-- Use a decision tree classifier model to predict new data instances.
-- Determine if text helps classification results.
-- Learn who pays back loans, and who doesn't.
+At the end of this case study, we will have a group discussion around the following questions:
 
+- Does text data help in predicting which borrowers will default?
+- Which words are most biased towards defaulting? Is this expected?
+- According to the decision tree models, what variables predict a default?
+- As a decision maker, would you recommend the use of textual data in your prediction algorithms?
+
+
+<!--
 # Loading the Data
+-->
 
-TODO
 
-
-```{r}
+```{r, include=FALSE}
 df <- read_csv("kiva.csv")
 ```
 
 
-
-A good idea when performing any data analytics activity is to spend time looking at some of the raw data. 
-
-```{r}
+```{r, include=FALSE}
 str(df)
 df$id = 1:nrow(df)
 df$status = as.factor(df$status)
@@ -54,202 +64,171 @@ df$sector = as.factor(df$sector)
 df$country = as.factor(df$country)
 df$gender = as.factor(df$gender)
 df$nonpayment = as.factor(df$nonpayment)
-str(df)
+```
+
+<!--
+Let's look at a sample of our data.
+-->
+
+```{r, include=FALSE}
 head(df, n=20)
 summary(df)
 ```
 
+<!--
 # Data Cleaning
+-->
 
-Clean up some of that English!
+```{r, include=FALSE}
+# Remove HTML Tags
+df = df %>% 
+  mutate(en = gsub("<.*?>", "", en))
 
-```{r}
-
-```
-
-
-# Feature Engineering
-
-
-Tidy up the text.
-
-```{r}
-# Remove HTML tags
-library(stringr)
-
-df %>% strings %>% str_replace("<.*>", "")
-```
-
-
-```{r}
-
+# Convert into tidytext format
 text_df <- df %>%
   select(id, status, en) %>%
   unnest_tokens(word, en)
-```
 
-Look at ngrams.
-
-```{r}
-  #unnest_tokens(ngram, en, token="ngrams", n=1)
-```
-
-# Remove stopwords
-
-```{r}
-custom_stop_words = data.frame(word=c("br", "h4", "loan", "business", "font", "times", "span"))
-
+## Remove stopwords
+custom_stop_words = data.frame(word=c("loan", "business"))
 text_df <- text_df %>%
   anti_join(stop_words, by=c("word"="word")) %>%
   anti_join(custom_stop_words, by=c("word"="word")) %>%
   arrange(id)
-```
 
-TODO: more stop words
-
-TODO: more cleaning
-
-
-```{r}
-head(text_df)
-```
-
-Count the top words.
-
-```{r}
-text_df %>% group_by(word) %>%
-  summarize(count=n()) %>%
-  mutate(freq = count / sum(count)) %>%
-  arrange(desc(count))
+# Stem words
+#library(SnowballC)
+#df = df %>% 
+#  mutate(en = wordStem(en))
 ```
 
 
-Count the top words by status.
-
-```{r}
-top_word = text_df %>% group_by(status, word) %>%
-  summarize(count=n()) %>%
-  mutate(freq = count / sum(count)) %>%
-  arrange(desc(count))
-
-top_word
-```
-
-Calculate the log ratio:
-
-```{r}
-TODO
-top_word %>%
-  spread(word, count) 
-```
-
-%>%
-  filter(topic1 > .001 | topic2 > .001) %>%
-  mutate(log_ratio = log2(topic2 / topic1))
-
-
-```{r}
-c = text_df %>%
-  group_by(id, word) %>%
-  summarize(count = n())
-
-# c %>% arrange(desc(count))
-
-```
-
-```{r}
-text_df %>%
-  bind_tf_idf(word, id, n)
-```
-
+<!-- 
+# Feature Engineering
 
 ## Latent Dirichlet Allocation
 
+Let's use a technique called Latent Dirichlet Allocation (LDA) to extract the topics from each document.
+-->
 
-```{r}
+```{r, include=FALSE}
+# Count each word in each document.
+word_counts = text_df %>%
+  group_by(id, word) %>%
+  summarize(count = n())
+```
 
-c
 
-a = c %>% cast_dtm(id, word, count)
-a
-str(a)
+```{r, include=FALSE}
+# Create a document term matrix
+dtm = word_counts %>% cast_dtm(id, word, count)
+
+# Remove sparse terms from the document term matrix.
 library(tm)
-dtm2.sparse <- removeSparseTerms(a, 0.9995)
-dtm2.sparse
+dtm2.nosparse <- removeSparseTerms(dtm, 0.9995)
 
-rowTotals <- apply(dtm2.sparse , 1, sum) #Find the sum of words in each Document
+rowTotals <- apply(dtm2.nosparse, 1, sum) #Find the sum of words in each Document
 which(rowTotals==0)
-dtm.new   <- dtm2.sparse[rowTotals> 0, ] 
-dtm.new
-
-ap_lda <- LDA(dtm.new, k = 10, control = list(seed = 1234))
-ap_lda
+dtm.new   <- dtm2.nosparse[rowTotals> 0, ] 
 ```
 
+<!--
+Run the LDA model.
+-->
+
+```{r, include=FALSE}
+num_topics = 12
+
+# Because the LDA model can take quite a few minutes to run, and because I run this script over and over again
+# checking its knitr output, I don't want to run LDA every single time. 
+runModel = FALSE
+if (runModel == TRUE) {
+  # Run the model
+  lda <- LDA(dtm.new, k = num_topics, control = list(seed = 1234))
+  
+  # Name each topic
+  t = terms(lda, k=4)
+  topic_names = apply(t, 2, function(x) paste(x, collapse = "_"))
+  
+  lda_beta <- tidy(lda, matrix = "beta")
+  lda_gamma <- tidy(lda, matrix = "gamma")
+  lda_gamma$document = as.integer(lda_gamma$document)
+  
+  # Save output
+  readr::write_csv(beta, sprintf("beta_%d.csv", num_topics))
+  readr::write_csv(lda_gamma, sprintf("gamma_%d.csv", num_topics))
+  readr::write_csv(as.data.frame(topic_names), sprintf("topicnames_%d.csv", num_topics))
+  
+} else {
+  # Read the output from a previous run
+  lda_beta = readr::read_csv(sprintf("beta_%d.csv", num_topics))
+  lda_gamma = readr::read_csv(sprintf("gamma_%d.csv", num_topics))
+  topic_names = t(readr::read_csv(sprintf("topicnames_%d.csv", num_topics)))
+}
+  
+```
+
+<!--
 Add the resulting document topic probabilities to the `df` dataframe.
+-->
 
-```{r}
+```{r, include=FALSE}
+lda_gamma_new = lda_gamma %>% spread(topic, gamma)
 
-readr::write_csv(tidy(ap_lda, "beta"), "beta.csv")
-
-readr::write_csv(tidy(ap_lda, "gamma"), "gamma.csv")
-
-ap_documents <- tidy(ap_lda, matrix = "gamma")
-
-ap_documents
-
-ap_documents = ap_documents %>% spread(topic, gamma)
-ap_documents$document = as.integer(ap_documents$document)
-
-
-df  = df %>%
-  left_join(ap_documents, by=c("id" = "document"))
-df
+df_new  = df %>% left_join(lda_gamma_new, by=c("id" = "document"))
+library(data.table)
+setnames(df_new, old=sprintf("%d", c(1:12)), new=sprintf("topic %d: %s", c(1:12), topic_names))
 ```
-
-
-```{r}
-ap_topics <- tidy(ap_lda, matrix = "beta")
-ap_topics
-
-ap_top_terms <- ap_topics %>%
-  group_by(topic) %>%
-  top_n(10, beta) %>%
-  ungroup() %>%
-  arrange(topic, -beta)
-```
-
-
-```{r,fig.width=10,fig.height=11}
-ap_top_terms %>%
-  mutate(term = reorder(term, beta)) %>%
-  ggplot(aes(term, beta, fill = factor(topic))) +
-  geom_col(show.legend = FALSE) +
-  facet_wrap(~ topic, scales = "free", ncol=3) +
-  coord_flip()
-```
-
-
-```{r}
-beta_spread <- ap_topics %>%
-  mutate(topic = paste0("topic", topic)) %>%
-  spread(topic, beta) %>%
-  filter(topic1 > .001 | topic2 > .001) %>%
-  mutate(log_ratio = log2(topic2 / topic1))
-
-beta_spread
-
-```
-
-
-
 
 
 # Descriptive Statistics
 
-It’s always a good idea to get familiar with the data by understanding the variables. How many are there, what are their types, are there any special notes? Let’s do just that.
- 
-The dataset contains the following 12 variables for each passenger. 
+It’s always a good idea to get familiar with the data by understanding the variables, their values, etc. 
+
+First, how many variables are there, and what are their names?
+
+```{r}
+ncol(df)
+colnames(df)
+```
+
+Most the names of the variables are self-describing. The `en` variable is the text variable, i.e., the personal story of the loan seeker.
+
+How many rows (records) are there?
+
+```{r}
+nrow(df)
+```
+
+<!-- 
+First thing's first, let's look at a sample of our data.
+-->
+
+```{r, rows.print=20, cols.print=10, include=FALSE}
+head(df, n=20)
+```
+
+Let's look at some basic summary statistics on the numeric columns columns:
+
+```{r}
+df %>%
+  select(-en) %>%
+  summary()
+```
+
+Let's look at a few of the records in full. Let's select four at random, two that have `paid`, and two that have `defaulted`.
+
+```{r}
+library(dplyr)
+library(knitr)
+sample = df %>%
+  slice(c(1, 1000, 5000, 6009)) %>%
+  select(-en, everything()) %>%
+  select(-id) %>%
+  mutate(en = gsub("\\\r", " ", en)) %>% 
+  mutate(en = gsub("\\\n", "", en))
+kable(sample)
+```
 
 
 ## Variable: sector
@@ -269,6 +248,8 @@ qplot(sector, data=df, geom="bar", fill=status, xlab="sector")+
 ```
 
 ## Variable: country
+
+Let's do the same for the `country` variable: cross tabulation table, and a graphical representation.
 
 ```{r}
 addmargins(table(df$country, df$status, dnn=c("country", "status")))
@@ -300,8 +281,11 @@ addmargins(table(df$nonpayment, df$status, dnn=c("nonpayment", "status")))
 qplot(nonpayment, data=df, geom="bar", fill=status)
 ```
 
+
+
 ## Variable: loan_amount
 
+Since the `loan_amount` variable is numeric, we can look at a density plot.
 
 ```{r}
 df %>% 
@@ -309,6 +293,7 @@ df %>%
   geom_density(fill = "orange")
 ```
 
+We can show a separate density for `status=defaulted` and `status=paid`.
 
 ```{r}
 df %>% 
@@ -316,6 +301,7 @@ df %>%
   geom_density(alpha=0.1) 
 ```
 
+And we can even show a "filled" density plot:
 
 ```{r}
 df %>% 
@@ -332,7 +318,140 @@ addmargins(table(df$loan_amount.cut, df$status, dnn=c("loan_amount.cut", "status
 
 ## Variable: en
 
-TODO
+The `en` variable is raw English text, and there's lots of ways we can look at it.
+
+First, let's look at the length (number of characters/letters).
+
+```{r}
+df %>%
+  mutate(en_length = nchar(en)) %>%
+  ggplot(aes(en_length, colour=status, fill=status)) +
+  geom_density(alpha=0.1)
+```
+
+Let's look at the top (i.e, most frequent) words.
+
+```{r rows.print=20}
+text_df %>% group_by(word) %>%
+  summarize(count=n()) %>%
+  mutate(freq = count / sum(count)) %>%
+  arrange(desc(count))
+```
+
+
+Now, let's see which words are more biased towards being `paid` or `defaulted`, using the log odds ratio metric.
+
+```{r}
+status_words_count = text_df %>% group_by(status, word) %>%
+  summarize(count=n()) %>%
+  arrange(desc(count))
+
+log_ratios = status_words_count %>% 
+  spread (status, count) %>%
+  select(-`<NA>`) %>%
+  mutate(defaulted = ifelse(is.na(defaulted), 0, defaulted)) %>%
+  mutate(paid = ifelse(is.na(paid), 0, paid)) %>%
+  mutate(total=defaulted+paid) %>%
+  mutate(log_ratio = log2(paid/defaulted)) 
+```
+
+```{r}
+log_ratios %>%
+  filter(total > 500) %>%
+  group_by(log_ratio < 0) %>%
+  top_n(15, abs(log_ratio)) %>%
+  ungroup() %>%
+  mutate(word = reorder(word, log_ratio)) %>%
+  ggplot(aes(word, log_ratio, fill = log_ratio < 0)) +
+  geom_col() +
+  coord_flip() +
+  ylab("log odds ratio") +
+  scale_fill_discrete(name = "", labels = c("paid", "default"))
+```
+
+Let's look at a table of the same data above, first focusing on the words that are biased towards `paid`:
+
+```{r rows.print=20 }
+log_ratios %>%
+  filter(total > 500) %>%
+  arrange(desc(log_ratio))
+```
+
+And those that are biased towards `default`:
+
+```{r rows.print=20}
+log_ratios %>%
+  filter(total > 500) %>%
+  arrange((log_ratio))
+```
+
+<!--
+Let's use the TF-IDF metric to see which words are the most "important":
+-->
+
+```{r, eval=FALSE}
+book_words <- text_df %>%
+  select(-status) %>%
+  count(id, word, sort = TRUE) %>%
+  ungroup()
+
+book_words %>% arrange(desc(n))
+
+total_words <- book_words %>% 
+  group_by(id) %>% 
+  summarize(total = sum(n))
+total_words %>% arrange(desc(total))
+
+book_words <- left_join(book_words, total_words)
+
+freq_by_rank <- book_words %>% 
+  group_by(id) %>% 
+  mutate(rank = row_number(), 
+         `term frequency` = n/total)
+book_words_tfidf <- book_words %>%
+  bind_tf_idf(word, id, n)
+
+book_words_tfidf %>%
+  arrange(desc(tf_idf))
+```
+
+
+## LDA Topics
+
+We used a techinque called Latent Dirichlet Allocation (LDA) to automatically uncover the topics from the documents. We told LDA to discover the `12` most important topics in the documents; LDA will also tell us which topics are in which documents.
+
+First, let's look at the top terms (words) in each discovered topic.
+
+```{r,fig.width=10,fig.height=11}
+ap_top_terms <- lda_beta %>%
+  group_by(topic) %>%
+  top_n(10, beta) %>%
+  ungroup() %>%
+  arrange(topic, -beta)
+
+ap_top_terms %>%
+  mutate(term = reorder(term, beta)) %>%
+  ggplot(aes(term, beta, fill = factor(topic))) +
+  geom_col(show.legend = FALSE) +
+  facet_wrap(~ topic, scales = "free", ncol=3) +
+  coord_flip()
+```
+
+Next, let's look at how many documents have each topic.
+
+```{r rows.print=12}
+lda_gamma %>%
+  left_join(df, by=c("document" = "id")) %>%
+  select(c(-en)) %>% 
+  filter(gamma >= 0.05) %>%
+  group_by(topic, status) %>% 
+  summarize(count=n()) %>%
+  spread(status, count) %>%
+  mutate(total = defaulted + paid)
+```
+
+
+
 
 # Building a Classifier Model
 
@@ -346,53 +465,33 @@ A decision tree path always starts with a root node (node number 1), which conta
  
 When creating a decision tree from data, the analyst can specify the number of nodes for the machine learning algorithm to create. More nodes leads to a more accurate model, at the cost of a more complicated and harder-to-interpret model. Likewise, fewer nodes usually leads to a less accurate model, but the model is easier to understand and interpret. 
  
-First thing's first, let's split the data into training and testing.
+
+# A model without the text
+
+First, as a baseline, let's train a decision tree classifier model without using any of the text or topics. Here is a graphical depiction of the model after it has been trained:
 
 ```{r}
 set.seed(123)
-train <- sample_frac(df, 0.8)
-test <- setdiff(df, train)
-```
+# Don't want to use either of these for prediction, and the - sign doesn't work
+# with rpart forumulas.
+df_notext = subset(df_new, select=c(status, sector, country, gender, loan_amount, nonpayment))
 
-## A model with the text
-
-Let's create the model. Let's shoot for fewer nodes, and therefore a simpler and less accurate model. Later, we'll look at a decision tree with more nodes. 
-
-```{r}
-colnames(df)
-form = as.formula(status ~ sector + country + gender + loan_amount + nonpayment + `1.y` + `2.y` + `3.y` + `4` + `5` + `6` + `7` + `8` + `9` + `10`)
-tree <- rpart(form, train, method="class")
-```
+# Split the data into training and testing.
+train_notext <- sample_frac(df_notext, 0.8)
+test_notext <- setdiff(df_notext, train_notext)
 
 
-The textual rendering contains the node number, the rule, the number of rows that matched this rule, the deviance of this rule, and finally, the probability of survival at this node.
-
-```{r}
-tree
-```
-
-
-```{r}
-printcp(tree)
-```
-
-Let's look at a graphical rendering of the decision tree.
-
-```{r}
+# Let's train the model.
+form = as.formula(status ~ .)
+tree <- rpart(form, train_notext, method="class")
 rpart.plot(tree, extra=2)
-```
-
-Let's use the classifier to predict the class of the testing data.
-
-
-```{r}
-predicted = predict(tree, test, type="class")
 ```
 
 Let's look at the confusion matrix.
 
 ```{r}
-actual = test$status
+predicted = predict(tree, test_notext, type="class")
+actual = test_notext$status
 table(actual, predicted)
 ```
 
@@ -408,28 +507,46 @@ print(sprintf("Specificity: %.3f", Specificity(y_true=predicted, y_pred=actual))
 ```
 
 
-# The Challenge
+# A model with the text
+
+Now, let's build the same decision tree classifier model as before, except now, let's include the LDA topics, built from the text.
+
+```{r}
+set.seed(123)
+# Don't want to use either of these for prediction, and the - sign doesn't work
+# with rpart forumulas.
+df_text = subset(df_new, select=c(-id, -en))
+
+# Split the data into training and testing.
+train_text <- sample_frac(df_text, 0.8)
+test_text <- setdiff(df_text, train_text)
 
 
- 
-# Questions
+# Let's create the model.
+form = as.formula(status ~ .)
+tree <- rpart(form, train_text, method="class")
+rpart.plot(tree, extra=2)
+```
 
-After digesting the above decision tree, answer the following questions.
- 
-- What is the most important variable in the decision tree? That is, which is the most important variable for predicting survival?
- 
-- Which path in the tree has the highest probability of survival?
- 
-- Which paths in the tree have the lowest probability of survival?
- 
-- What would be the chances of survival of a third class female?
- 
-- Of all third class females, what is the effect of ticket fares?
- 
-- Of males that are younger than 6.5 years old, which variable most predicted their fate?
- 
-- Which path is taken by the most passengers?
- 
-- Using the decision tree model, what would be the most likely fate for the following passenger?
-ID=891, Pclass=3, Name=Mr. Patrick Dooley, Sex=male, Age=32, Sibsp=0, Parch=0, TicketNumber=370376, Fare=7.75, Cabin=N/A, Embarked=Q, Title=Mr, Fsize=1, Child=Adult, Mother=NotMother
+Confusion matrix:
 
+```{r}
+predicted = predict(tree, test_text, type="class")
+actual = test_text$status
+table(actual, predicted)
+```
+
+Metrics:
+
+```{r}
+print(sprintf("Accuracy:    %.3f", Accuracy(y_true=actual, y_pred=predicted)))
+print(sprintf("Precision:   %.3f", Precision(y_true=actual, y_pred=predicted)))
+print(sprintf("Recall:      %.3f", Recall(y_true=actual, y_pred=predicted)))
+print(sprintf("F1 Score:    %.3f", F1_Score(predicted, actual)))
+print(sprintf("Sensitivity: %.3f", Sensitivity(y_true=actual, y_pred=predicted)))
+print(sprintf("Specificity: %.3f", Specificity(y_true=predicted, y_pred=actual)))
+```
+
+ 
+
+ 
