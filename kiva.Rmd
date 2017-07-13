@@ -29,11 +29,11 @@ library(tidytext)
 
 # Introduction
 
-Kiva Microfunds is a non-profit that allows people to lend money to low0income entrepreneurs and students around the world. Started in 2005, Kiva has crowd-funded millions of loans with a repayment rate of 98% to 99%.
+Kiva Microfunds is a non-profit that allows people to lend money to low-income entrepreneurs and students around the world. Started in 2005, Kiva has crowd-funded millions of loans with a repayment rate of 98% to 99%.
 
 In additional to traditional demographic data, Kiva includes personal stories on each loan seaker because they want their leanders to connect with their entreprenuers on a human level.
 
-In this case study, we will build a prediction model (in particular, a decision tree classifier) to predict who will pay back loans, and who will default. A key question we want to ask is: does adding text (i.e., the personal stories) to the model increase its prediction power?
+In this case study, we will build a prediction model (in particular, a decision tree classifier) to predict who will pay back loans, and who will default. A key question we explore is: does adding text (i.e., the personal stories) to the prediction model increase or decrease its prediction power?
 
 
 # Discussion Questions
@@ -41,9 +41,9 @@ In this case study, we will build a prediction model (in particular, a decision 
 At the end of this case study, we will have a group discussion around the following questions:
 
 - Does text data help in predicting which borrowers will default?
-- Which words are most biased towards defaulting? Is this expected?
+- Which words are most biased towards defaulting? Is this expected/intuitive?
 - According to the decision tree models, what variables predict a default?
-- As a decision maker, would you recommend the use of textual data in your prediction algorithms?
+- As a decision maker, would you recommend the use of textual data in your prediction models?
 
 
 <!--
