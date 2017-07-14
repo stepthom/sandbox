@@ -566,7 +566,7 @@ ap_top_terms %>%
 
 Next, let's look at how many documents have each topic.
 
-```{r rows.print=12}
+```{r}
 topic_totals = lda_gamma %>%
   left_join(df, by=c("document" = "id")) %>%
   select(c(-en)) %>% 
@@ -579,7 +579,7 @@ topic_totals = lda_gamma %>%
   select(topic, topic_name, everything())
 ```
 
-```{r fig.height=6}
+```{r fig.height=4}
 tmp_gathered = topic_totals %>% 
   select(topic, topic_name, defaulted, paid) %>% 
   gather(Status, Value, defaulted, paid)
