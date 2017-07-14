@@ -579,7 +579,7 @@ topic_totals = lda_gamma %>%
   select(topic, topic_name, everything())
 ```
 
-```{r fig.height=4}
+```{r fig.height=5}
 tmp_gathered = topic_totals %>% 
   select(topic, topic_name, defaulted, paid) %>% 
   gather(Status, Value, defaulted, paid)
