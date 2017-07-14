@@ -1,49 +1,87 @@
 ---
-title: "Classification Case Study: Kiva Loans"
-output: 
-  html_document: 
-    code_folding: hide
-    toc: true
-    toc_depth: 2
-    number_sections: true
-    theme: journal
-author: "Stephen W. Thomas"
+title: "Document Classification Case Study: Kiva Loans"
+author: "Dr. Stephen W. Thomas, Queen's University"
+date: "July 14, 2017"
+output:
+  pdf_document:
+    highlight: pygments
+    number_sections: yes
+    toc: no
+    toc_depth: '2'
 ---
 
+
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = FALSE, warning=FALSE, message=FALSE)
+knitr::opts_chunk$set(echo = FALSE, warning=FALSE, message=FALSE, fig.align='center')
 ```
 
 ```{r}
 library(tidyverse)
 library(scales)
-library(titanic)
 library(rpart)
 library(rpart.plot)
 library(RColorBrewer)
 library(MLmetrics)
 library(topicmodels)
 library(tidytext)
+library(knitr)
+library(kableExtra)
 ```
 
 
+
+\hrulefill
+<hr/>
+
+```{r, echo=FALSE, out.width = "150px"}
+knitr::include_graphics("kivaloans.jpg")
+```
+
 # Introduction
 
-Kiva Microfunds is a non-profit that allows people to lend money to low-income entrepreneurs and students around the world. Started in 2005, Kiva has crowd-funded millions of loans with a repayment rate of 98% to 99%.
-
-In additional to traditional demographic data, Kiva includes personal stories on each loan seaker because they want their leanders to connect with their entreprenuers on a human level.
-
-In this case study, we will build a prediction model (in particular, a decision tree classifier) to predict who will pay back loans, and who will default. A key question we explore is: does adding text (i.e., the personal stories) to the prediction model increase or decrease its prediction power?
+[Kiva Microfunds](https://www.kiva.org/) is a non-profit that allows people to lend money to low-income entrepreneurs and students around the world. Started in 2005, Kiva has crowd-funded millions of loans with a repayment rate of 98% to 99%.
 
 
-# Discussion Questions
+In additional to traditional demographic data, Kiva includes personal stories on each borrower because they want lenders to connect with the borrowers on a human level. An example:
+
+*Evelyn is 40 years old and married with 3 kids. She is in the Karura Hope women group and her life has been changed by the first KIVA loan she received last year which she is completing this quarter. Before she received the loan, she used to sell 9 litres of milk daily to local residents. After receiving the loan she bought iron sheets, five cement packets, one lorry of sand, some ballast and animal feed for her cows and improved her cow shed. Today she sells a daily average of 40 litres of milk to the Kiamba Dairy cooperative society, which is affiliated to the Kenya Cooperative Creameries at a cost of USD 0.28 per litre. Her daily farming has really grown. Evelyn intends to buy another dairy cow and a tank of water for home consumption and for her cows. She intends to repay in monthly installments.*
+
+Despite her uplifting story, and her previous successful loan, Evelyn defaulted on her next loan of 900 USD.
+
+In this case study, we will explore past Kiva loans and build a prediction model (in particular, a decision tree classifier) to predict which future borrowers will pay back loans, and which will default. A key question we will explore is: does adding text (i.e., the personal stories) to the prediction model increase or decrease its prediction power?
+
+This case study will provide lots of data and graphs, but is intentionally light on commentary, analysis, and decision making. That's your job!
+
+
+## Case Discussion Questions
 
 At the end of this case study, we will have a group discussion around the following questions:
 
-- Does text data help in predicting which borrowers will default?
-- Which words are most biased towards defaulting? Is this expected/intuitive?
-- According to the decision tree models, what variables predict a default?
-- As a decision maker, would you recommend the use of textual data in your prediction models?
+1. Does text data help in predicting which loan seeker will default?
+2. Which words are most biased towards defaulting? Is this expected/intuitive?
+3. According to the decision tree prediction models, what variables best predict a default?
+4. As a decision maker, would you recommend the use of textual data in your prediction models?
+
+
+# Kiva Background
+
+The key terms in the Kiva world are:
+
+- **The loan**. A loan is the most important data object at Kiva. Most other objects are in some way related to a loan.
+
+- **The borrower**. A borrower is someone who has requested a loan. Borrowers are often
+referred to as "businesses or "entrepreneurs" in order to emphasize the entrepreneurial spirit of
+these individuals who work to make a difference in their lives. 
+
+- **The lender**. A lender is a user registered on the Kiva website for the purposes of lending money and
+participating in the community. Some lenders have public profiles, known as lender pages, on
+the Kiva website, where they can share details about their activities and mission. Most lenders,
+however, refrain from displaying their public information and are referred to as “anonymous.”
+
+- **The partner.** A partner, or Kiva field partner, is usually a microfinance institution with which Kiva works to
+find and fund loans. Every loan at Kiva is offered by a partner to a borrower, and the partner
+works with Kiva to get funding for that loan from lenders.
+
 
 
 <!--
@@ -165,6 +203,10 @@ if (runModel == TRUE) {
   lda_gamma = readr::read_csv(sprintf("gamma_%d.csv", num_topics))
   topic_names = t(readr::read_csv(sprintf("topicnames_%d.csv", num_topics)))
 }
+
+tn = data.frame(id=1:12, topic_name = as.character(t(topic_names)))
+tn$topic_name = as.character(tn$topic_name)
+tn$topic_name = sprintf("%02d: %s", 1:12, tn$topic_name)
   
 ```
 
@@ -181,163 +223,220 @@ setnames(df_new, old=sprintf("%d", c(1:12)), new=sprintf("topic %d: %s", c(1:12)
 ```
 
 
-# Descriptive Statistics
 
-It’s always a good idea to get familiar with the data by understanding the variables, their values, etc. 
+# Data Description
 
-First, how many variables are there, and what are their names?
+The data is collected from [build.kiva](http://build.kiva.org/), Kiva's website for providing snapshots of their data from time to time. In the full dataset, about 98% of loans are repaid and 2% defaulted. In this case study, we look at only a sample of the data, where the split between repaid and defaulted is closer to 50%-50%.
 
-```{r}
-ncol(df)
-colnames(df)
-```
+Let's look at our sample to understand the size, shape, values, and patterns in the variables. The dataset inclues `r ncol(df)` variables, named: `r colnames(df)`. Most the names of the variables are self-describing. The `en` variable is the text variable, i.e., the personal story of the loan seeker, and will be our main source of investigation. There are `r nrow(df)` records/rows/loans in our sample.
 
-Most the names of the variables are self-describing. The `en` variable is the text variable, i.e., the personal story of the loan seeker.
 
-How many rows (records) are there?
 
-```{r}
-nrow(df)
-```
 
-<!-- 
-First thing's first, let's look at a sample of our data.
--->
-
-```{r, rows.print=20, cols.print=10, include=FALSE}
-head(df, n=20)
-```
-
-Let's look at some basic summary statistics on the numeric columns columns:
-
-```{r}
-df %>%
-  select(-en) %>%
-  summary()
-```
-
-Let's look at a few of the records in full. Let's select four at random, two that have `paid`, and two that have `defaulted`.
-
-```{r}
+```{r, eval=FALSE}
+# Let's look at a few of the records in full.
+# NEver got this to work on my machine, for some reason.
 library(dplyr)
 library(knitr)
 sample = df %>%
-  slice(c(1, 1000, 5000, 6009)) %>%
+  slice(c(1, 5000, 6009, 444, 7322)) %>%
   select(-en, everything()) %>%
   select(-id) %>%
   mutate(en = gsub("\\\r", " ", en)) %>% 
   mutate(en = gsub("\\\n", "", en))
-kable(sample)
+
+
+library(kableExtra)
+kable(sample, "latex") %>%
+  kable_styling(font_size = 7) %>%
+  column_spec(7, width = "15em")
 ```
+
+
+
+
+
+<P style="page-break-before: always">
+\newpage
 
 
 ## Variable: sector
 
-Below is a cross tabulation for the variables sector (rows) and status (columns), along with sums of each row and column.
+The first variable in the dataset is `sector`. Let's look at how many loans are in each sector, and tabulate how many have paid and how many have defaulted.
 
-```{r}
-addmargins(table(df$sector, df$status, dnn=c("sector", "status")))
-```
-
- 
-Below is a graphical representation of the same tabulation, color-coded by those who paid (blue, bottom) and those who did not (orange, top):
-
-```{r}
+```{r fig.height=4}
 qplot(sector, data=df, geom="bar", fill=status, xlab="sector")+
-  theme(axis.text.x = element_text(angle = 90, hjust = 1)) 
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) 
 ```
+
+\vspace{20pt}
+<br/>
+<hr/>
+
+```{r}
+kable(df %>%
+  group_by(sector, status) %>%
+  summarize(count=n()) %>%
+  spread(status, count) %>%
+  mutate(total = defaulted + paid), "latex", booktab=TRUE) %>%
+  kable_styling(full_width=TRUE, latex_options = c("striped", "scale_down"))
+```
+
+
+
+
+<P style="page-break-before: always">
+\newpage
+
 
 ## Variable: country
 
 Let's do the same for the `country` variable: cross tabulation table, and a graphical representation.
 
-```{r}
-addmargins(table(df$country, df$status, dnn=c("country", "status")))
+
+```{r fig.height=2.5}
+qplot(country, data=df, geom="bar", fill=status)
 ```
 
+
+\vspace{20pt}
+<br/>
+<hr/>
+
 ```{r}
-qplot(country, data=df, geom="bar", fill=status)+
-  theme(axis.text.x = element_text(angle = 90, hjust = 1)) 
+kable(df %>%
+  group_by(country, status) %>%
+  summarize(count=n()) %>%
+  spread(status, count) %>%
+  mutate(total = defaulted + paid), "latex", booktab=TRUE) %>%
+  kable_styling(full_width=TRUE, latex_options = c("striped", "scale_down"))
 ```
 
 
 ## Variable: gender
 
-```{r}
-addmargins(table(df$gender, df$status, dnn=c("gender", "status")))
-```
 
-```{r}
+```{r fig.height=2.5}
 qplot(gender, data=df, geom="bar", fill=status)
 ```
 
-## Variable: nonpayment
+
+\vspace{20pt}
+<br/>
+<hr/>
 
 ```{r}
-addmargins(table(df$nonpayment, df$status, dnn=c("nonpayment", "status")))
+kable(df %>%
+  group_by(gender, status) %>%
+  summarize(count=n()) %>%
+  spread(status, count) %>%
+  mutate(total = defaulted + paid), "latex", booktab=TRUE) %>%
+  kable_styling(full_width=TRUE, latex_options = c("striped", "scale_down"))
 ```
 
-```{r}
+
+
+<P style="page-break-before: always">
+\newpage
+## Variable: nonpayment
+
+The nonpayment variable captures who is liable if a loan defaults: the lender, or the partner.
+
+
+```{r fig.height=4}
 qplot(nonpayment, data=df, geom="bar", fill=status)
 ```
 
+\vspace{20pt}
+<br/>
+<hr/>
+
+```{r}
+kable(df %>%
+  group_by(nonpayment, status) %>%
+  summarize(count=n()) %>%
+  spread(status, count) %>%
+  mutate(total = defaulted + paid), "latex", booktab=TRUE) %>%
+  kable_styling(full_width=TRUE, latex_options = c("striped", "scale_down"))
+```
 
 
+
+
+
+<P style="page-break-before: always">
+\newpage
 ## Variable: loan_amount
 
 Since the `loan_amount` variable is numeric, we can look at a density plot.
 
-```{r}
+```{r fig.height=2.5}
 df %>% 
   ggplot(aes(loan_amount)) +
-  geom_density(fill = "orange")
+  geom_density(fill = "blue", alpha=0.6) 
 ```
 
 We can show a separate density for `status=defaulted` and `status=paid`.
 
-```{r}
+```{r fig.height=2.5}
 df %>% 
   ggplot(aes(loan_amount, colour=status, fill=status)) +
-  geom_density(alpha=0.1) 
+  geom_density(alpha=0.1)
 ```
 
 And we can even show a "filled" density plot:
 
-```{r}
+```{r fig.height=2.5}
 df %>% 
   ggplot(aes(loan_amount, colour=status, fill=status)) +
   geom_density(alpha=0.1, position="fill") 
 ```
 
-```{r}
+```{r, include=FALSE}
 df$loan_amount.cut = cut(df$loan_amount, breaks=c(0, 300, 600, 900, 1500))
 addmargins(table(df$loan_amount.cut, df$status, dnn=c("loan_amount.cut", "status")))
 ```
 
 
 
+
+
+<P style="page-break-before: always">
+\newpage
 ## Variable: en
 
 The `en` variable is raw English text, and there's lots of ways we can look at it.
 
-First, let's look at the length (number of characters/letters).
+### Length
 
-```{r}
+First, let's look at a density plot of the length (number of characters/letters).
+
+```{r fig.height=2.5}
 df %>%
   mutate(en_length = nchar(en)) %>%
   ggplot(aes(en_length, colour=status, fill=status)) +
-  geom_density(alpha=0.1)
+  geom_density(alpha=0.1) +
+  labs(x = "Number of characters in `en`")
 ```
+
+### Top Words
 
 Let's look at the top (i.e, most frequent) words.
 
 ```{r rows.print=20}
-text_df %>% group_by(word) %>%
+kable(text_df %>% group_by(word) %>%
   summarize(count=n()) %>%
   mutate(freq = count / sum(count)) %>%
-  arrange(desc(count))
+  arrange(desc(count)) %>%
+  top_n(20), "latex", booktab=TRUE) %>%
+  kable_styling(full_width=TRUE, latex_options = c("striped", "scale_down"))
 ```
 
+
+<P style="page-break-before: always">
+\newpage
+
+### Most Biased Words
 
 Now, let's see which words are more biased towards being `paid` or `defaulted`, using the log odds ratio metric.
 
@@ -355,7 +454,7 @@ log_ratios = status_words_count %>%
   mutate(log_ratio = log2(paid/defaulted)) 
 ```
 
-```{r}
+```{r, fig.height=4}
 log_ratios %>%
   filter(total > 500) %>%
   group_by(log_ratio < 0) %>%
@@ -369,20 +468,30 @@ log_ratios %>%
   scale_fill_discrete(name = "", labels = c("paid", "default"))
 ```
 
-Let's look at a table of the same data above, first focusing on the words that are biased towards `paid`:
 
-```{r rows.print=20 }
-log_ratios %>%
+Let's look at a tabular version of the same data above, first focusing on the words that are biased towards `paid`:
+
+```{r}
+kable(log_ratios %>%
   filter(total > 500) %>%
-  arrange(desc(log_ratio))
+  arrange(desc(log_ratio)) %>%
+  top_n(17), "latex", booktab=TRUE) %>%
+  kable_styling(full_width=TRUE, latex_options = c("striped", "scale_down"))
 ```
+
+
+<P style="page-break-before: always">
+\newpage
+
 
 And those that are biased towards `default`:
 
 ```{r rows.print=20}
-log_ratios %>%
+kable(log_ratios %>%
   filter(total > 500) %>%
-  arrange((log_ratio))
+  arrange((log_ratio)) %>%
+  top_n(-20), "latex", booktab=TRUE) %>%
+  kable_styling(full_width=TRUE, latex_options = c("striped", "scale_down"))
 ```
 
 <!--
@@ -416,9 +525,20 @@ book_words_tfidf %>%
 ```
 
 
+
+
+
+
+
+<P style="page-break-before: always">
+\newpage
+
+
 ## LDA Topics
 
 We used a techinque called Latent Dirichlet Allocation (LDA) to automatically uncover the topics from the documents. We told LDA to discover the `12` most important topics in the documents; LDA will also tell us which topics are in which documents.
+
+### LDA Top Terms Per Topic
 
 First, let's look at the top terms (words) in each discovered topic.
 
@@ -431,31 +551,58 @@ ap_top_terms <- lda_beta %>%
 
 ap_top_terms %>%
   mutate(term = reorder(term, beta)) %>%
+  left_join(tn, by=c("topic" = "id")) %>% 
   ggplot(aes(term, beta, fill = factor(topic))) +
   geom_col(show.legend = FALSE) +
-  facet_wrap(~ topic, scales = "free", ncol=3) +
+  facet_wrap(~ topic_name, scales = "free", ncol=3) +
   coord_flip()
 ```
+
+
+<P style="page-break-before: always">
+\newpage
+
+### Documents per LDA Topic
 
 Next, let's look at how many documents have each topic.
 
 ```{r rows.print=12}
-lda_gamma %>%
+topic_totals = lda_gamma %>%
   left_join(df, by=c("document" = "id")) %>%
   select(c(-en)) %>% 
   filter(gamma >= 0.05) %>%
   group_by(topic, status) %>% 
   summarize(count=n()) %>%
   spread(status, count) %>%
-  mutate(total = defaulted + paid)
+  mutate(total = defaulted + paid) %>% 
+  left_join(tn, by=c("topic" = "id")) %>%
+  select(topic, topic_name, everything())
+```
+
+```{r fig.height=6}
+tmp_gathered = topic_totals %>% 
+  select(topic, topic_name, defaulted, paid) %>% 
+  gather(Status, Value, defaulted, paid)
+
+ggplot(tmp_gathered, aes(x=topic_name, y=Value, fill=Status)) + 
+  geom_bar(stat="identity") +  
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) 
+```
+
+```{r}
+kable(topic_totals, "latex", booktab=TRUE) %>%
+  kable_styling(full_width=TRUE, latex_options = c("striped", "scale_down"))
 ```
 
 
 
+<P style="page-break-before: always">
+\newpage
+
 
 # Building a Classifier Model
 
-Now that we have explored the data, it’s time to dive deeper. Which variable(s) are the biggest predictors of status? This is where classifier models shine. They can tell us exactly how all the variables relate to each other, and which are most important.
+Now that we have explored the data, it’s time to dive deeper. Which variable(s) are the biggest predictors of `status`? This is where classifier models shine. They can tell us exactly how all the variables relate to each other, and which are most important.
  
 A decision tree is a popular classifier model in analytics. Here, the decision tree is automatically created by a machine learning algorithm as it learns simple decision rules from the data. These automatically-learned rules can then be used to both understand the variables and to predict future data. A big advantage of decision trees over other classifier models is that they are relatively simple for humans to understand and interpret.
  
@@ -465,12 +612,18 @@ A decision tree path always starts with a root node (node number 1), which conta
  
 When creating a decision tree from data, the analyst can specify the number of nodes for the machine learning algorithm to create. More nodes leads to a more accurate model, at the cost of a more complicated and harder-to-interpret model. Likewise, fewer nodes usually leads to a less accurate model, but the model is easier to understand and interpret. 
  
+ 
+ 
+ 
+<P style="page-break-before: always">
+\newpage
 
-# A model without the text
+
+# A Prediction Model without the Text
 
 First, as a baseline, let's train a decision tree classifier model without using any of the text or topics. Here is a graphical depiction of the model after it has been trained:
 
-```{r}
+```{r fig.height=3}
 set.seed(123)
 # Don't want to use either of these for prediction, and the - sign doesn't work
 # with rpart forumulas.
@@ -487,13 +640,21 @@ tree <- rpart(form, train_notext, method="class")
 rpart.plot(tree, extra=2)
 ```
 
-Let's look at the confusion matrix.
+\vspace{20pt}
+
+Now, let's see how accurate the model is. We'll use some never-before-seen data (called _testing data_). We'll give the testing data to the classifier, ask it to make a prediction (i.e., whether the borrower will pay or not), and then we'll see if the classifier is correct. 
+
+The following table summarizes the predictions of the classifier.
 
 ```{r}
 predicted = predict(tree, test_notext, type="class")
 actual = test_notext$status
-table(actual, predicted)
+preds = data.frame((table(predicted, actual)))
+kable(preds, "latex", booktab=TRUE) %>%
+  kable_styling(full_width=TRUE, latex_options = c("striped", "scale_down"))
 ```
+
+That is, the model predicted `defaulted` 50 times correctly, and 24 times incorrectly. It also predicted `paid` correctly 120 times, and 39 times incorrectly.
 
 Let's check the accuracy and other metrics of the classifier on the testing data.
 
@@ -507,11 +668,18 @@ print(sprintf("Specificity: %.3f", Specificity(y_true=predicted, y_pred=actual))
 ```
 
 
-# A model with the text
 
-Now, let's build the same decision tree classifier model as before, except now, let's include the LDA topics, built from the text.
 
-```{r}
+
+<P style="page-break-before: always">
+\newpage
+
+
+# A Prediction Model with the Text
+
+Now, let's build the same decision tree classifier model as before, except now, let's include the LDA topics, which were built from the text. (Note: there are many _other_ textual features we could include in this model: individual words, clusters, etc. However, we'll keep it simple for now.)
+
+```{r fig.height=3}
 set.seed(123)
 # Don't want to use either of these for prediction, and the - sign doesn't work
 # with rpart forumulas.
@@ -528,13 +696,20 @@ tree <- rpart(form, train_text, method="class")
 rpart.plot(tree, extra=2)
 ```
 
+\vspace{20pt}
+
 Confusion matrix:
 
 ```{r}
 predicted = predict(tree, test_text, type="class")
 actual = test_text$status
-table(actual, predicted)
+preds.text = data.frame((table(predicted, actual)))
+kable(preds.text, "latex", booktab=TRUE) %>%
+  kable_styling(full_width=TRUE, latex_options = c("striped", "scale_down"))
 ```
+
+
+\vspace{20pt}
 
 Metrics:
 
@@ -547,6 +722,12 @@ print(sprintf("Sensitivity: %.3f", Sensitivity(y_true=actual, y_pred=predicted))
 print(sprintf("Specificity: %.3f", Specificity(y_true=predicted, y_pred=actual)))
 ```
 
- 
+<P style="page-break-before: always">
+\newpage
 
+
+# Appendix: Further Reading
+
+- [Kiva.org](https://www.kiva.org/). Kiva's homepage.
+- [Build.Kiva](http://build.kiva.org/). Kiva data dumps and data description.
  
