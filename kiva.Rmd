@@ -42,15 +42,15 @@ knitr::include_graphics("kivaloans.jpg")
 [Kiva Microfunds](https://www.kiva.org/) is a non-profit that allows people to lend money to low-income entrepreneurs and students around the world. Started in 2005, Kiva has crowd-funded millions of loans with a repayment rate of 98% to 99%.
 
 
-In additional to traditional demographic data, Kiva includes personal stories on each borrower because they want lenders to connect with the borrowers on a human level. An example:
+Kiva includes both traditional demographic information, such as gender and location, as well as personal stories on each borrower because Kiva wants lenders to connect with the borrowers on a human level. An example:
 
 *Evelyn is 40 years old and married with 3 kids. She is in the Karura Hope women group and her life has been changed by the first KIVA loan she received last year which she is completing this quarter. Before she received the loan, she used to sell 9 litres of milk daily to local residents. After receiving the loan she bought iron sheets, five cement packets, one lorry of sand, some ballast and animal feed for her cows and improved her cow shed. Today she sells a daily average of 40 litres of milk to the Kiamba Dairy cooperative society, which is affiliated to the Kenya Cooperative Creameries at a cost of USD 0.28 per litre. Her daily farming has really grown. Evelyn intends to buy another dairy cow and a tank of water for home consumption and for her cows. She intends to repay in monthly installments.*
 
 Despite her uplifting story, and her previous successful loan, Evelyn defaulted on her next loan of 900 USD.
 
-In this case study, we will explore past Kiva loans and build a prediction model (in particular, a decision tree classifier) to predict which future borrowers will pay back loans, and which will default. A key question we will explore is: does adding text (i.e., the personal stories) to the prediction model increase or decrease its prediction power?
+In this case study, we will explore past Kiva loans and build a prediction model (in particular, a decision tree classifier) to predict which future borrowers will pay back loans, and which will default. A key question we will explore is: does adding text (i.e., the personal stories) to the prediction model increase or decrease the model's prediction power?
 
-This case study will provide lots of data and graphs, but is intentionally light on commentary, analysis, and decision making. That's your job!
+This case study will provide lots of data, tables, and graphs, but is intentionally light on commentary, analysis, and decision making. That's your job!
 
 
 ## Case Discussion Questions
@@ -61,24 +61,25 @@ At the end of this case study, we will have a group discussion around the follow
 2. Which words are most biased towards defaulting? Is this expected/intuitive?
 3. According to the decision tree prediction models, what variables best predict a default?
 4. As a decision maker, would you recommend the use of textual data in your prediction models?
+5. As a lender, what other information would you like to have?
 
 
 # Kiva Background
 
-The key terms in the Kiva world are:
+The key concepts in the Kiva world are:
 
-- **The loan**. A loan is the most important data object at Kiva. Most other objects are in some way related to a loan.
+- **Loan**. A loan is the most important concept at Kiva. Most other concepts are in some way related to a loan.
 
-- **The borrower**. A borrower is someone who has requested a loan. Borrowers are often
-referred to as "businesses or "entrepreneurs" in order to emphasize the entrepreneurial spirit of
+- **Borrower**. A borrower is someone who has requested a loan. Borrowers are often
+referred to as ``businesses'' or ``entrepreneurs'' in order to emphasize the entrepreneurial spirit of
 these individuals who work to make a difference in their lives. 
 
-- **The lender**. A lender is a user registered on the Kiva website for the purposes of lending money and
+- **Lender**. A lender is a user registered on the Kiva website for the purposes of lending money and
 participating in the community. Some lenders have public profiles, known as lender pages, on
 the Kiva website, where they can share details about their activities and mission. Most lenders,
 however, refrain from displaying their public information and are referred to as “anonymous.”
 
-- **The partner.** A partner, or Kiva field partner, is usually a microfinance institution with which Kiva works to
+- **Partner.** A partner, or Kiva field partner, is usually a microfinance institution with which Kiva works to
 find and fund loans. Every loan at Kiva is offered by a partner to a borrower, and the partner
 works with Kiva to get funding for that loan from lenders.
 
@@ -226,9 +227,9 @@ setnames(df_new, old=sprintf("%d", c(1:12)), new=sprintf("topic %d: %s", c(1:12)
 
 # Data Description
 
-The data is collected from [build.kiva](http://build.kiva.org/), Kiva's website for providing snapshots of their data from time to time. In the full dataset, about 98% of loans are repaid and 2% defaulted. In this case study, we look at only a sample of the data, where the split between repaid and defaulted is closer to 50%-50%.
+The data in this case study was collected from [http://build.kiva.org](http://build.kiva.org/), Kiva's website that provides snapshots of Kiva loan data. In the full dataset, about 98% of loans are paid and 2% defaulted. In this case study, we look at only a sample of the data, where the split between paid and defaulted is closer to 50%-50%.
 
-Let's look at our sample to understand the size, shape, values, and patterns in the variables. The dataset inclues `r ncol(df)` variables, named: `r colnames(df)`. Most the names of the variables are self-describing. The `en` variable is the text variable, i.e., the personal story of the loan seeker, and will be our main source of investigation. There are `r nrow(df)` records/rows/loans in our sample.
+Let's look at our sample to understand the size, shape, values, and patterns in the variables. The sample includes `r ncol(df)` variables, named: `r colnames(df)`. Each variable is explored in turn. The `en` variable is the text variable, i.e., the personal story of the loan seeker, and will be our main source of investigation. There are `r nrow(df)` records/rows/loans in our sample.
 
 
 
@@ -253,7 +254,33 @@ kable(sample, "latex") %>%
 ```
 
 
+<P style="page-break-before: always">
+\newpage
 
+
+## Variable: status
+
+The `status` variable indicates whether a loan was `paid` or `defaulted`. As previously described, the data has a fairly even split between these two options.
+
+\vspace{10pt}
+
+```{r fig.height=4}
+qplot(status, data=df, geom="bar", fill=status, xlab="status") + theme(legend.position = "none")
+```
+
+
+\vspace{20pt}
+<br/>
+<hr/>
+
+Below is a table with the actual counts.
+
+```{r}
+kable(df %>%
+  group_by(status) %>%
+  summarize(count=n()), "latex", booktab=TRUE) %>%
+  kable_styling(full_width=TRUE, latex_options = c("striped", "scale_down"))
+```
 
 
 <P style="page-break-before: always">
@@ -262,7 +289,9 @@ kable(sample, "latex") %>%
 
 ## Variable: sector
 
-The first variable in the dataset is `sector`. Let's look at how many loans are in each sector, and tabulate how many have paid and how many have defaulted.
+The figure below shows the number of loans in each sector, coloured by the loan's `status`. 
+
+\vspace{10pt}
 
 ```{r fig.height=4}
 qplot(sector, data=df, geom="bar", fill=status, xlab="sector")+
@@ -272,6 +301,8 @@ qplot(sector, data=df, geom="bar", fill=status, xlab="sector")+
 \vspace{20pt}
 <br/>
 <hr/>
+
+Below is a tabulation of the same data.
 
 ```{r}
 kable(df %>%
@@ -291,8 +322,9 @@ kable(df %>%
 
 ## Variable: country
 
-Let's do the same for the `country` variable: cross tabulation table, and a graphical representation.
+Below is the same for the `country` variable.
 
+\vspace{10pt}
 
 ```{r fig.height=2.5}
 qplot(country, data=df, geom="bar", fill=status)
@@ -342,6 +374,7 @@ kable(df %>%
 
 The nonpayment variable captures who is liable if a loan defaults: the lender, or the partner.
 
+\vspace{10pt}
 
 ```{r fig.height=4}
 qplot(nonpayment, data=df, geom="bar", fill=status)
@@ -368,7 +401,8 @@ kable(df %>%
 \newpage
 ## Variable: loan_amount
 
-Since the `loan_amount` variable is numeric, we can look at a density plot.
+Unlike the other variables thus far, the `loan_amount` variable is numeric. Below is a density plot, which shows the most popular loan amounts.
+
 
 ```{r fig.height=2.5}
 df %>% 
@@ -376,7 +410,7 @@ df %>%
   geom_density(fill = "blue", alpha=0.6) 
 ```
 
-We can show a separate density for `status=defaulted` and `status=paid`.
+Below are separate density curves for `status=defaulted` and `status=paid`.
 
 ```{r fig.height=2.5}
 df %>% 
@@ -384,7 +418,7 @@ df %>%
   geom_density(alpha=0.1)
 ```
 
-And we can even show a "filled" density plot:
+Below is a filled density plot:
 
 ```{r fig.height=2.5}
 df %>% 
@@ -405,11 +439,11 @@ addmargins(table(df$loan_amount.cut, df$status, dnn=c("loan_amount.cut", "status
 \newpage
 ## Variable: en
 
-The `en` variable is raw English text, and there's lots of ways we can look at it.
+The `en` variable is raw English text, and there's lots of ways to look at it.
 
 ### Length
 
-First, let's look at a density plot of the length (number of characters/letters).
+The figure below is a density plot of the length (number of characters/letters).
 
 ```{r fig.height=2.5}
 df %>%
@@ -421,7 +455,7 @@ df %>%
 
 ### Top Words
 
-Let's look at the top (i.e, most frequent) words.
+The table below shows the top (i.e, most frequently occuring) words.
 
 ```{r rows.print=20}
 kable(text_df %>% group_by(word) %>%
@@ -438,7 +472,7 @@ kable(text_df %>% group_by(word) %>%
 
 ### Most Biased Words
 
-Now, let's see which words are more biased towards being `paid` or `defaulted`, using the log odds ratio metric.
+The plots below show which words are most biased towards being `paid` or `defaulted`, using the log odds ratio metric.
 
 ```{r}
 status_words_count = text_df %>% group_by(status, word) %>%
@@ -469,7 +503,7 @@ log_ratios %>%
 ```
 
 
-Let's look at a tabular version of the same data above, first focusing on the words that are biased towards `paid`:
+Below are tabular versions of the same data above, starting with the words that are biased towards `paid`:
 
 ```{r}
 kable(log_ratios %>%
@@ -536,11 +570,11 @@ book_words_tfidf %>%
 
 ## LDA Topics
 
-We used a techinque called Latent Dirichlet Allocation (LDA) to automatically uncover the topics from the documents. We told LDA to discover the `12` most important topics in the documents; LDA will also tell us which topics are in which documents.
+Next, we used a techinque called Latent Dirichlet Allocation (LDA) to automatically extract high-level topics from the documents. We told LDA to extract the `12` most important topics; LDA will also tell us which topics are in which documents.
 
 ### LDA Top Terms Per Topic
 
-First, let's look at the top terms (words) in each discovered topic.
+This figure shows the top terms (words) in each of the 12 discovered topic.
 
 ```{r,fig.width=10,fig.height=11}
 ap_top_terms <- lda_beta %>%
@@ -564,7 +598,7 @@ ap_top_terms %>%
 
 ### Documents per LDA Topic
 
-Next, let's look at how many documents have each topic.
+The figure below shows the number of documents that contain each topic, coloured by `status`.
 
 ```{r}
 topic_totals = lda_gamma %>%
@@ -619,9 +653,9 @@ When creating a decision tree from data, the analyst can specify the number of n
 \newpage
 
 
-# A Prediction Model without the Text
+## A Prediction Model without the Text
 
-First, as a baseline, let's train a decision tree classifier model without using any of the text or topics. Here is a graphical depiction of the model after it has been trained:
+First, as a baseline, we trained a decision tree classifier model without using any of the text or topics. Below is a graphical depiction of the model after it has been trained:
 
 ```{r fig.height=3}
 set.seed(123)
@@ -642,21 +676,26 @@ rpart.plot(tree, extra=2)
 
 \vspace{20pt}
 
-Now, let's see how accurate the model is. We'll use some never-before-seen data (called _testing data_). We'll give the testing data to the classifier, ask it to make a prediction (i.e., whether the borrower will pay or not), and then we'll see if the classifier is correct. 
+To measure the prediction performance, we used some never-before-seen data (called _testing data_). We gave the testing data to the classifier, asked it to make a prediction (i.e., whether the borrower will pay or not), and then compared it to the true answer. 
 
 The following table summarizes the predictions of the classifier.
 
 ```{r}
 predicted = predict(tree, test_notext, type="class")
 actual = test_notext$status
-preds = data.frame((table(predicted, actual)))
+preds = data.frame((table(predicted, actual))) %>%
+  spread(actual, Freq) %>%
+  mutate(total = defaulted + paid) %>%
+  select(predicted, total, everything())
+
 kable(preds, "latex", booktab=TRUE) %>%
-  kable_styling(full_width=TRUE, latex_options = c("striped", "scale_down"))
+  kable_styling(full_width=TRUE, latex_options = c("striped", "scale_down")) %>%
+  add_header_above(c(" " = 2, "actual" = 2))
 ```
 
-That is, the model predicted `defaulted` 50 times correctly, and 24 times incorrectly. It also predicted `paid` correctly 120 times, and 39 times incorrectly.
+That is, the model predicted `defaulted` 74 times: 50 times correctly, and 24 times incorrectly. It predicted `paid` 159 times: 120 times correctly, and 39 times incorrectly.
 
-Let's check the accuracy and other metrics of the classifier on the testing data.
+Below is the accuracy and other metrics of the classifier on the testing data.
 
 ```{r}
 print(sprintf("Accuracy:    %.3f", Accuracy(y_true=actual, y_pred=predicted)))
@@ -675,9 +714,9 @@ print(sprintf("Specificity: %.3f", Specificity(y_true=predicted, y_pred=actual))
 \newpage
 
 
-# A Prediction Model with the Text
+## A Prediction Model with the Text
 
-Now, let's build the same decision tree classifier model as before, except now, let's include the LDA topics, which were built from the text. (Note: there are many _other_ textual features we could include in this model: individual words, clusters, etc. However, we'll keep it simple for now.)
+We then built the same kind of decision tree classifier model as before, except now, we included the LDA topics, which were built from the text. (Note: there are many _other_ textual features we could include in this model: individual words, clusters, etc. However, we  kept it simple for now.) Below is the result.
 
 ```{r fig.height=3}
 set.seed(123)
@@ -698,14 +737,20 @@ rpart.plot(tree, extra=2)
 
 \vspace{20pt}
 
-Confusion matrix:
+Below is a summary of its predictions:
 
 ```{r}
 predicted = predict(tree, test_text, type="class")
 actual = test_text$status
-preds.text = data.frame((table(predicted, actual)))
+preds.text = data.frame((table(predicted, actual))) %>%
+  spread(actual, Freq) %>%
+  mutate(total = defaulted + paid) %>%
+  select(predicted, total, everything())
+
+
 kable(preds.text, "latex", booktab=TRUE) %>%
-  kable_styling(full_width=TRUE, latex_options = c("striped", "scale_down"))
+  kable_styling(full_width=TRUE, latex_options = c("striped", "scale_down")) %>%
+  add_header_above(c(" " = 2, "actual" = 2))
 ```
 
 
