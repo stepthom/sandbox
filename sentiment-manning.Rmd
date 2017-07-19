@@ -1,5 +1,13 @@
 ---
-title: "Peyton Manning vs. Tom Brady"
+title: "Sentiment Analysis Case Study: Peyton Manning vs. Tom Brady"
+author: "Dr. Stephen W. Thomas, Queen's University"
+date: "July 14, 2017"
+output:
+  pdf_document:
+    highlight: pygments
+    number_sections: yes
+    toc: no
+    toc_depth: '2'
 ---
 
 
@@ -14,64 +22,95 @@ library(ggplot2)
 library(readr)
 library(lubridate)
 library(stringr)
+library(scales)
 ```
 
 
 ```{r}
-tweets_manning<- read_csv("manning.csv")
-tweets_manning
-
 # Example input: "Thu Oct 02 15:38:29 +0000 2014"
-# Desired output: A libridate object: "2014-10-02 15:38:29 UTC"
 configDate = function(x) {
   tmp = strsplit(x, "\\s+")[[1]]
-  paste(tmp[2], tmp[3], tmp[6])
-  as.Date(paste(tmp[2], tmp[3], tmp[6], tmp[4]), "%b %d %Y")
-  #mdy_hms(new)
+  as.POSIXct(paste(tmp[2], tmp[3], tmp[6]), format="%b %d %Y", tz="GMT")
 }
-
-tweets_manning<- read_csv("manning.csv")
-tweets_brady <- read_csv("brady.csv")
-tweets <- bind_rows(tweets_manning %>% 
-                      mutate(person = "Manning")
-                    
-                    ,
-                    tweets_brady %>% 
-                      mutate(person = "Brady"))
-
-
-
-tweets$timestamp = 0
-for (i in 1:nrow(tweets)){
-  tweets[i,]$timestamp = configDate(tweets[i,]$time)
-}
-
-tweets$timestamp = lapply(tweets$time, configDate)
-str(tweets)
-summary(tweets)
-head(tweets)
-
-write_csv(tweets, "alltweets.csv")
-
-tweets2 = tweets %>% mutate(timestamp2 = )
-
-
-library(scales)
-ggplot(tweets, aes(x = as.Date(timestamp), fill = person)) +
-  geom_histogram(position = "identity", bins = 30, show.legend = FALSE) +
-  facet_wrap(~person, ncol = 1, scales = "free_y") + 
-  scale_x_date(labels = date_format("%m-%Y"))
 ```
 
 ```{r}
+
+createDate = FALSE
+if (createDate == TRUE){
+  tweets_manning <- read_csv("manning.csv")
+  tweets_brady <- read_csv("brady.csv")
+  tweets <- bind_rows(tweets_manning %>% 
+                        mutate(person = "Manning"),
+                      tweets_brady %>% 
+                        mutate(person = "Brady"))
+  
+  tweets$timestamp = 0
+  for (i in 1:nrow(tweets)){
+    tweets[i,]$timestamp = configDate(tweets[i,]$time)
+  }
+  
+  tweets = tweets %>% 
+    select(-time) %>%
+    select(id, timestamp, person, text)
+  
+  write_csv(tweets, "alltweets.csv")
+} else {
+  tweets = read_csv("alltweets.csv")
+}
+
+ggplot(tweets, aes(x = as.POSIXct(timestamp, origin="1970-01-01"), fill = person)) +
+  geom_histogram(position = "identity", bins = 11, show.legend = FALSE) +
+  facet_wrap(~person, ncol = 1, scales = "free_y") + 
+  scale_x_datetime(labels = date_format("%b %d %Y", tz="GMT"), breaks=date_breaks("1 day")) +
+  labs(x="Date", y="Number of Tweets") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) 
+```
+
+```{r}
+
+
+# TODO:
+# Count exact duplicates
+# Count retweets
+# Count tweets with url
+# Count length of tweets
+
+tweets %>%
+  group_by(text) %>%
+  summarize(count = n()) %>%
+  arrange(desc(count))
+  
+
 replace_reg <- "https://t.co/[A-Za-z\\d]+|http://[A-Za-z\\d]+|&amp;|&lt;|&gt;|RT|https"
 unnest_reg <- "([^A-Za-z_\\d#@']|'(?![A-Za-z_\\d#@]))"
-tidy_tweets <- tweets %>% 
-  filter(!str_detect(text, "^RT")) %>%
-  mutate(text = str_replace_all(text, replace_reg, "")) %>%
-  unnest_tokens(word, text, token = "regex", pattern = unnest_reg) %>%
-  filter(!word %in% stop_words$word,
-         str_detect(word, "[a-z]"))
+custom_stop_words = data.frame(word=c("loan", "business"))
 
+# Remove URLs
+tweets = tweets %>% 
+  mutate(text = gsub("(f|ht)tp(s?)://\\S+", "", text))
+
+# Remove Retweets
+tweets = tweets %>% 
+  mutate(text = gsub("(f|ht)tp(s?)://\\S+", "", text))
+
+tweets
+
+text_df <- tweets %>% 
+  filter(!str_detect(text, "^RT")) %>%
+  #mutate(text = str_replace_all(text, replace_reg, "")) %>%
+  #unnest_tokens(word, text, token = "regex", pattern = unnest_reg) %>%
+  unnest_tokens(word, text)
+
+text_df
+
+## Remove stopwords
+custom_stop_words = data.frame(word=c("loan", "business"))
+text_df <- text_df %>%
+  anti_join(stop_words, by=c("word"="word")) %>%
+  anti_join(custom_stop_words, by=c("word"="word")) %>%
+  arrange(id)
+
+tweets
 tidy_tweets
 ```

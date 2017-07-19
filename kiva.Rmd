@@ -71,7 +71,7 @@ The key concepts in the Kiva world are:
 - **Loan**. A loan is the most important concept at Kiva. Most other concepts are in some way related to a loan.
 
 - **Borrower**. A borrower is someone who has requested a loan. Borrowers are often
-referred to as ``businesses'' or ``entrepreneurs'' in order to emphasize the entrepreneurial spirit of
+referred to as *businesses* or *entrepreneurs* in order to emphasize the entrepreneurial spirit of
 these individuals who work to make a difference in their lives. 
 
 - **Lender**. A lender is a user registered on the Kiva website for the purposes of lending money and
@@ -570,13 +570,13 @@ book_words_tfidf %>%
 
 ## LDA Topics
 
-Next, we used a techinque called Latent Dirichlet Allocation (LDA) to automatically extract high-level topics from the documents. We told LDA to extract the `12` most important topics; LDA will also tell us which topics are in which documents.
+Next, we used a techinque called Latent Dirichlet Allocation (LDA) to automatically extract high-level topics from the documents. We told LDA to extract the `12` most important topics; LDA will also tell us which topics are in which documents. For example, a document might have 50% of its words come from topic 1, 25% of its words come from topic 5, and the remaining 25% of its words come from topic 12.
 
 ### LDA Top Terms Per Topic
 
 This figure shows the top terms (words) in each of the 12 discovered topic.
 
-```{r,fig.width=10,fig.height=11}
+```{r,fig.width=10,fig.height=8}
 ap_top_terms <- lda_beta %>%
   group_by(topic) %>%
   top_n(10, beta) %>%
@@ -598,7 +598,7 @@ ap_top_terms %>%
 
 ### Documents per LDA Topic
 
-The figure below shows the number of documents that contain each topic, coloured by `status`.
+The figure below shows the number of documents that contain each topic (i.e., more than 5%), coloured by `status`.
 
 ```{r}
 topic_totals = lda_gamma %>%
@@ -620,11 +620,50 @@ tmp_gathered = topic_totals %>%
 
 ggplot(tmp_gathered, aes(x=topic_name, y=Value, fill=Status)) + 
   geom_bar(stat="identity") +  
-  theme(axis.text.x = element_text(angle = 45, hjust = 1)) 
+  theme(axis.text.x = element_text(angle = 65, hjust = 1)) 
 ```
 
 ```{r}
 kable(topic_totals, "latex", booktab=TRUE) %>%
+  kable_styling(full_width=TRUE, latex_options = c("striped", "scale_down"))
+```
+
+
+<P style="page-break-before: always">
+\newpage
+
+### LDA Examples
+
+Below is an example of an application whose `en` variable contained LDA topic 8 at 99%. 
+
+*Senaida Agueda has a business in which she buys and resells clothing that she has been operating for about 2 years now with the help of loans from Esperanza. She has two children, 41 and 38, whom do not live with Mrs. Agueda. When not working with her clothing shop, she enjoys going to the beach and cooking, arroz con carne (rice with meat) being one of her favorite dishes. As Mrs. Agueda is in her elder years and has fully grown children, she simply wishes to sustain her business to support her and her husband. Mrs. Senaida Agueda is a member of an eight person group, Group 4, that is part of a larger micro-bank called Mujeres de Fe, "Women of Faith" in English. In the picture, Mrs. Agueda is third from the right along with members of her group and some others of Mujeres de Fe. Her story is just one of a list of men and women who are improving their quality of life through the help of micro-credit loans of Esperanza. Together, this group has united with a common vision of a better life with faith and hope in their hearts and an unbreakable spirit. The concept of group lending is to have loans paid in a group to reduce the risk of a person defaulting, as others pick up where a person may lag to receive the next loan. Each of the associates in this bank has a similar business whether it is a motor taxi service or selling cosmetics. Thank you for your support and awareness of this issue, and it is your concern and efforts that is able to bring a difference to the lives of people such as Mrs. Agueda.*
+
+Below is an example for LDA topic 4: 
+
+ *Descripcin del Negocio. La Sra Angela se dedica a la venta de articulos para el hogar a credito y de forma anbulante ademas vende golosinas a llos nios de una escuela. En la actualidad vende a personas de otros sectores que han sido recomendados por buenos clientes que le refieren esos sitios. Uso del Prstamo. Ella necesita el credito para comprar mas mercaderia pues en estas epocas de fin de aos le son muy solicitadas. Informacin Personal. Ella tiene 29 aos y tiene dos hijos que estudian su casa es de caa y tiene estabilidad familiar. Translated from Spanish by Kiva Volunteer Wendy Wise*
+
+
+And finally, below is an example for LDA topic 1:
+
+*Mary is 65 years of age, married with six children. All her children are married and self-reliant. She is a member of St Jude group at Githunguri in Thika district. Mary is earns her income as a dairy farmer. She needs a USD 150 loan to help her buy another small high breed dairy calf, which she will raise to maturity. She plans to meet her repayments on monthly basis.*
+
+
+```{r, eval=FALSE, include=FALSE}
+ids = lda_gamma %>%
+  filter(topic==1) %>%
+  arrange(desc(gamma)) %>%
+  top_n(1000) %>%
+  left_join(df_new, by=c("document" = "id")) %>%
+  mutate(len = nchar(en)) %>%
+  arrange(len)
+ids
+ids = c(7830, 7306, 7258, 7105)
+
+df[7306,3]
+
+df_new[ids,]
+
+kable(t(df_new[ids[1],]), "latex", booktab=TRUE)  %>%
   kable_styling(full_width=TRUE, latex_options = c("striped", "scale_down"))
 ```
 
