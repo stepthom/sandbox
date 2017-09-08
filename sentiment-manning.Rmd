@@ -23,6 +23,7 @@ library(readr)
 library(lubridate)
 library(stringr)
 library(scales)
+library(int64)
 ```
 
 
@@ -58,7 +59,9 @@ if (createDate == TRUE){
 } else {
   tweets = read_csv("alltweets.csv")
 }
+```
 
+```{r}
 ggplot(tweets, aes(x = as.POSIXct(timestamp, origin="1970-01-01"), fill = person)) +
   geom_histogram(position = "identity", bins = 11, show.legend = FALSE) +
   facet_wrap(~person, ncol = 1, scales = "free_y") + 
@@ -69,19 +72,19 @@ ggplot(tweets, aes(x = as.POSIXct(timestamp, origin="1970-01-01"), fill = person
 
 ```{r}
 
-
 # TODO:
 # Count exact duplicates
 # Count retweets
 # Count tweets with url
 # Count length of tweets
 
+
+# Show duplicate tweets
 tweets %>%
   group_by(text) %>%
   summarize(count = n()) %>%
   arrange(desc(count))
   
-
 replace_reg <- "https://t.co/[A-Za-z\\d]+|http://[A-Za-z\\d]+|&amp;|&lt;|&gt;|RT|https"
 unnest_reg <- "([^A-Za-z_\\d#@']|'(?![A-Za-z_\\d#@]))"
 custom_stop_words = data.frame(word=c("loan", "business"))
@@ -90,27 +93,45 @@ custom_stop_words = data.frame(word=c("loan", "business"))
 tweets = tweets %>% 
   mutate(text = gsub("(f|ht)tp(s?)://\\S+", "", text))
 
-# Remove Retweets
+# Remove URLs
 tweets = tweets %>% 
   mutate(text = gsub("(f|ht)tp(s?)://\\S+", "", text))
 
 tweets
+```
 
+
+Create tidy format.
+```{r}
 text_df <- tweets %>% 
-  filter(!str_detect(text, "^RT")) %>%
+  #filter(!str_detect(text, "^RT")) %>%
   #mutate(text = str_replace_all(text, replace_reg, "")) %>%
   #unnest_tokens(word, text, token = "regex", pattern = unnest_reg) %>%
   unnest_tokens(word, text)
 
 text_df
+```
 
+
+```{r}
 ## Remove stopwords
 custom_stop_words = data.frame(word=c("loan", "business"))
 text_df <- text_df %>%
   anti_join(stop_words, by=c("word"="word")) %>%
   anti_join(custom_stop_words, by=c("word"="word")) %>%
   arrange(id)
+```
 
-tweets
-tidy_tweets
+
+Do sentiment analysis for 
+
+```{r}
+nrc <- get_sentiments("nrc")
+
+text_df %>%
+  filter(person == "Manning") %>%
+  inner_join(nrc) %>%
+  count(word, sort = TRUE)
+
+
 ```
