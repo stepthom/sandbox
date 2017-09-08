@@ -3,26 +3,64 @@ title: "SQL Challenge"
 ---
 
 
+```{eval=FALSE, include=FALSE}
+
+The schema for the tables:
+
+create table master (
+playerID text,
+birthYear integer,
+birthMonth integer,
+birthDay integer,
+birthCountry text,
+birthState text,
+birthCity text,
+deathYear integer,
+deathMonth int,
+deathDay int,
+deathCountry text,
+deathState text,
+deathCity text,
+nameFirst text,
+nameLast text,
+nameGiven text,
+weight int,
+height int,
+bats  text,
+throws text,
+debut date,
+finalGame  text,
+retroID text,
+bbrefID text,
+deathDate date,
+birthDate date
+);
+
+create table salaries(
+yearID int,
+teamID text,
+lgID text,
+playerID text,
+salary int
+)
+```
+
 ```{r, message=FALSE}
-library(tidyverse)
+library(tidyverse) 
 library(sqldf)
 library(Lahman)
-colnames(Master)
 
+str(Master)
+str(Salaries)
 
-
- colnames(Salaries)
+#write_csv(Salaries, path="Salaries.csv")
  
- head(Master, n=10)
+head(Master, n=10)
 ```
 
 
 ### Let's just look at the structure of the tables we will use
 
-
-```{r}
-colnames(Master)
-```
 
 ```{r}
 sqldf("select * from Master limit 10")

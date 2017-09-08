@@ -14,12 +14,15 @@ trans = read.csv("transaction.csv", header=TRUE)
 ```
 ```{r}
 sqldf("select * from customer")
+
+
+ 
 ```
 
 
 
 ```{r}
-sqldf("select * from trans")
+sqldf("SELECT customer_id, SUM(total) FROM trans GROUP BY customer_id")
 ```
 
 ```{r}
@@ -28,7 +31,10 @@ sqldf("select distinct province from customer")
 
 
 ```{r}
-sqldf("select * from trans order by total DESC, date DESC")
+sqldf("SELECT yearID, AVG(salary) 
+FROM Salaries 
+GROUP BY yearID 
+ORDER BY yearID ASC")
 ```
 ```{r}
 sqldf("select * from customer where city !='Kingston'")

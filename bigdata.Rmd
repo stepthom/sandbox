@@ -1,0 +1,45 @@
+---
+title: "bigdataslides"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(tidyverse)
+```
+
+```{r}
+
+# Just some charts for my big data slides.
+
+base_size = 8
+iwidth = 3
+iheight = 1.75
+
+theme_set(theme_gray(base_size = base_size))
+
+df = data.frame(Tool=c("MapReduce", "Spark"), RunningTime= c(110.0, 0.9))
+ggplot(df, aes(Tool, RunningTime)) + geom_bar(stat="identity", aes(fill=Tool)) + 
+  ylab("Running Time (seconds)") +
+  theme(legend.position = "none")
+ggsave(file="spark_time.pdf", width=iwidth, height=iheight)
+
+
+df = data.frame(Tool=c("Spark", "MapReduce", "Storm", "Tez"), Contribs= c(120, 101, 31, 20))
+ggplot(df, aes(x=reorder(Tool, -Contribs), y=Contribs)) + geom_bar(stat="identity", aes(fill=Tool)) + 
+  ylab("New Contributors") +
+  xlab("Tool") +
+  theme(legend.position = "none")
+ggsave(file="spark_contrib.pdf", width=4.5, height=2)
+
+df = data.frame(Tool=c("Spark", "MapReduce", "Tez", "Storm"), Patches= c(198, 22, 46, 25))
+ggplot(df, aes(x=reorder(Tool, -Patches), y=Patches)) + geom_bar(stat="identity", aes(fill=Tool)) + 
+  ylab("Patches") +
+  xlab("Tool") +
+  theme(legend.position = "none")
+ggsave(file="spark_patches.pdf", width=4.5, height=2)
+
+```
