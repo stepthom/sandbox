@@ -14,8 +14,8 @@ output:
 
 ```{r}
 library(tidytext)
-library(RSentiment)
-library(cleanNLP)
+#library(RSentiment)
+#library(cleanNLP)
 library(tidyr)
 library(dplyr)
 library(ggplot2)
@@ -23,7 +23,7 @@ library(readr)
 library(lubridate)
 library(stringr)
 library(scales)
-library(int64)
+#library(int64)
 ```
 
 
@@ -57,8 +57,14 @@ if (createDate == TRUE){
   
   write_csv(tweets, "alltweets.csv")
 } else {
-  tweets = read_csv("alltweets.csv")
+  tweets = read_csv("alltweets.csv", col_types = list(id = col_number()))
 }
+
+tweets$id = c(1:nrow(tweets))
+tweets[1:10,]
+
+tweets <- tweets %>%
+  sample_frac(0.1)
 ```
 
 ```{r}
@@ -103,6 +109,7 @@ tweets
 
 Create tidy format.
 ```{r}
+
 text_df <- tweets %>% 
   #filter(!str_detect(text, "^RT")) %>%
   #mutate(text = str_replace_all(text, replace_reg, "")) %>%
@@ -127,11 +134,48 @@ Do sentiment analysis for
 
 ```{r}
 nrc <- get_sentiments("nrc")
-
-text_df %>%
-  filter(person == "Manning") %>%
+head(text_df)
+sents = text_df %>%
   inner_join(nrc) %>%
-  count(word, sort = TRUE)
+  count(person, id = id, timestamp=timestamp, sentiment) %>%
+  spread(sentiment, n, fill = 0) %>%
+  mutate(sentiment = positive - negative) %>%
+  arrange(sentiment)
+```
 
 
+Look at examples
+Quantify sentiment by rating
+Look at average
+Look at average over time
+Look at different emotions
+Try different lexicons
+
+
+```{r}
+sents
+sents %>%
+  ggplot(aes(sentiment)) + geom_histogram() + facet_wrap(~person)
+
+
+sents %>%
+  filter(person=="Manning") %>%
+  group_by(sentiment) %>%
+  summarise (n = n()) %>%
+  mutate(freq = n / sum(n), cum = cumsum(freq))
+
+sents %>%
+  filter(person=="Brady") %>%
+  group_by(sentiment) %>%
+  summarise (n = n()) %>%
+  mutate(freq = n / sum(n), cum = cumsum(freq))
+```
+
+```{r}
+tweets[tweets$id==6621,]$text
+```
+
+```{r}
+text_df %>%
+  filter (id == 1739)
 ```

@@ -95,7 +95,7 @@ quality(rules) <- cbind(quality(rules),
 ```
 
 ```{r}
-# List the top 40 rules, ordered by lift
+# List the top 40 rules, ordered by conviction
 inspect(head(rules, n=40, by = "conviction"))
 ```
 
@@ -121,10 +121,10 @@ inspect(sort(subset(rules,
 
 ## Example
 
-Both “whole milk” and “yogurt” must be present and rule’s confidence must be higher than .95
+Both “whole milk” and “yogurt” must be present and rule’s confidence must be higher than .9
 
 ```{r}
-inspect(subset(rules, subset=items %ain% c("whole milk","yogurt") & confidence >.95))
+inspect(subset(rules, subset=items %ain% c("whole milk","yogurt") & confidence >.90))
 ```
 
 
