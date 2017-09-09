@@ -26,24 +26,27 @@ library(scales)
 library(tm)
 ```
 
-Read in the data.
+# Read in the data
 
 ```{r}
 imdb = read_delim("all.imdb.pipe.csv", delim="|", quote="")
 
+# Give each row a unique id
 imdb <- imdb %>%
   mutate(id = 1:nrow(imdb)) %>%
   select(id, everything())
 
+# For now, just take a fraction
 imdb <- imdb %>%
   sample_frac(0.03)
 
+# Inspect
 head(imdb)
-
 ```
 
 ```{r}
-# Investigating  what uid means.
+# This is not really important. I was just 
+# investigating  what uid means.
 
 imdb %>%
   group_by(uid) %>%
@@ -58,59 +61,67 @@ imdb %>%
 ```
 
 
-Convert to tidy text
+# Convert to tidy text
 
 ```{r}
 tidy <- imdb %>% 
   unnest_tokens(word, review)
-
 tidy
 ```
 
 
 # Some descriptive stats
+
+Most frequent words.
 ```{r}
-# Word frequences
 word_freqs = tidy %>%
   group_by(word) %>%
   summarize(n = n()) %>%
   arrange(desc(n))
   
-# Show most frequent words  
 word_freqs %>%
   top_n(50)
 ```
 
 
+Least frequent words 
 ```{r}
-# Show least frequent words  
 word_freqs %>%
   top_n(-50)
 ```
 
+
+Sentiment distribution
 ```{r}
-# Sentiment distribution
 tidy %>%
   group_by(sentiment) %>%
   summarize(n = n()) %>%
   mutate(freq= n/sum(n))
 ```
 
+
+Most positive and negative words
 ```{r}
-# Most positive and negative words
 sentiment_words_count = tidy %>% 
   group_by(sentiment, word) %>%
   summarize(count=n()) %>%
   arrange(desc(count))
-```
 
-```{r}
 log_ratios = sentiment_words_count %>% 
   spread (sentiment, count) %>%
   mutate(negative = ifelse(is.na(negative), 0, negative)) %>%
   mutate(positive = ifelse(is.na(positive), 0, positive)) %>%
   mutate(total=negative+positive) %>%
   mutate(log_ratio = log2(positive/negative)) 
+
+# Save this for later, to be used as features in classification:
+# the most polarizing words
+top_log_ratios = log_ratios %>%
+  filter(total > 50) %>%
+  group_by(log_ratio < 0) %>%
+  top_n(40, abs(log_ratio)) %>%
+  ungroup() %>%
+  mutate(word = reorder(word, log_ratio))
 
 log_ratios %>%
   filter(total > 50) %>%
@@ -125,9 +136,10 @@ log_ratios %>%
   scale_fill_discrete(name = "", labels = c("positive", "negative"))
 ```
 
-```{r}
-# Log odd ratio chart for n-grams
 
+Log odd ratio chart for n-grams
+
+```{r}
 tidy_tri <- imdb %>% 
   unnest_tokens(word, review, token="ngrams", n=2)
 
@@ -144,12 +156,6 @@ log_ratios_tri = sentiment_words_count_tri %>%
   mutate(total=negative+positive) %>%
   mutate(log_ratio = log2(positive/negative)) 
 
-
-log_ratios_tri %>%
-  filter(total > 50) %>%
-  arrange(desc(log_ratio))
-
-
 log_ratios_tri %>%
   filter(total > 100) %>%
   group_by(log_ratio < 0) %>%
@@ -164,44 +170,112 @@ log_ratios_tri %>%
 ```
 
 
-# Convert to tm format
+# Build a classifier.
 
-Create DTM
+Create the feature matrix.
+
+There's a lot of features we can have for each document:
+- Word frequencies of all words
+- Word frequencies of only the most frequent words
+- Word frequencies of only the most polarizing words
+- Any of the above, except with binary word frequencies
+- Topic memberships (after running e.g., LDA)
+- Cluster memberships (after running e.g., kmeans)
+
+For now, we'll go with the third approach. We'll start by creating a DTM.
+
 ```{r}
+
+
+# First, need to get the counts of each polarizing word in each doc
 tidy_counts = tidy %>%
+  filter(word %in% top_log_ratios$word) %>% # only keep most polarizing words
   group_by(id, uid, sentiment, word) %>%
   summarize(count = n())
 
-tidy_counts
-
+# Make the DTM
 dtm <- tidy_counts %>%
   cast_dtm(id, word, count)
 
-tidy_counts %>%
-  filter(id==57)
+# Can optionally do some preprocessing using some functions in the tm package
+# dtm <- removeSparseTerms(dtm, 0.1)
+# dtm <- removeNumbers(dtm)
+# dtm <- removePunctuation(dtm)
 
-inspect(dtm[1:10, 1:20])
-
-
-dtm <- removeSparseTerms(dtm, 0.7)
-dtm
-
+# Convert the dtm to a dataframe, so we can pass it into some classifiers
 df <- as.data.frame(as.matrix(dtm))
-df
 
-# Get the truth label
+# Get the truth label.
+# How I do this is a bit wonky. What we have to do is append a column to our df 
+# above that is the truth label. To do this, we'll:
+# - Create a new dataframe with just the id and the label
+# - Join that new dataframe to the one above, by id
+
 labels = tidy %>%
-  group_by(id, sentiment) %>%
-  select(id, sentiment)
+  group_by(id) %>%
+  summarize(sentiment=max(sentiment)) %>%
+  as.data.frame()
 
-labels
+rownames(labels) <- labels[,1]
+labels[,1] <- NULL
 df_l = merge(df, labels, by="row.names", all.x=TRUE)
+df_l[,1] <- NULL # Don't want the pesky "RowNames" column hanging around
+```
 
+Split into training and testing.
 
+```{r}
+# Training and testing
+smp_size <- floor(0.75 * nrow(df_l))
+set.seed(123)
+train_ind <- sample(seq_len(nrow(df_l)), size = smp_size)
+
+train <- df_l[train_ind, ]
+test <- df_l[-train_ind, ]
+```
+
+Decision Trees.
+
+```{r}
+library(rpart)
+library(rpart.plot)
+tree <- rpart(sentiment ~ ., data=train)
+tree
+rpart.plot(tree, extra=2)
+
+predicted = predict(tree, test, type="class")
+actual = test$sentiment
+(table(predicted, actual))
+
+library(MLmetrics)
+print(sprintf("Accuracy:    %.3f", Accuracy(y_true=actual, y_pred=predicted)))
+print(sprintf("Precision:   %.3f", Precision(y_true=actual, y_pred=predicted)))
+print(sprintf("Recall:      %.3f", Recall(y_true=actual, y_pred=predicted)))
+print(sprintf("F1 Score:    %.3f", F1_Score(predicted, actual)))
+print(sprintf("Sensitivity: %.3f", Sensitivity(y_true=actual, y_pred=predicted)))
+print(sprintf("Specificity: %.3f", Specificity(y_true=predicted, y_pred=actual)))
 ```
 
 
-Build classifier
+Naive Bayes
 ```{r}
 
+# TODO: need to first change features to be binary and categorical
+
+library(e1071)
+nb <- naiveBayes(sentiment ~ ., data=train)
+nb
+
+predicted.nb = predict(nb, test, type="class")
+predicted.nb
+actual = test$sentiment
+(table(predicted.nb, actual))
+
+library(MLmetrics)
+print(sprintf("Accuracy:    %.3f", Accuracy(y_true=actual, y_pred=predicted.nb)))
+print(sprintf("Precision:   %.3f", Precision(y_true=actual, y_pred=predicted.nb)))
+print(sprintf("Recall:      %.3f", Recall(y_true=actual, y_pred=predicted.nb)))
+print(sprintf("F1 Score:    %.3f", F1_Score(predicted.nb, actual)))
+print(sprintf("Sensitivity: %.3f", Sensitivity(y_true=actual, y_pred=predicted.nb)))
+print(sprintf("Specificity: %.3f", Specificity(y_true=predicted.nb, y_pred=actual)))
 ```
