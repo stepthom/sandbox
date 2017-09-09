@@ -14,8 +14,8 @@ output:
 
 ```{r}
 library(tidytext)
-#library(RSentiment)
-#library(cleanNLP)
+library(RSentiment)
+library(cleanNLP)
 library(tidyr)
 library(dplyr)
 library(ggplot2)
@@ -23,7 +23,6 @@ library(readr)
 library(lubridate)
 library(stringr)
 library(scales)
-#library(int64)
 ```
 
 
