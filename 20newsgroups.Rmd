@@ -1,0 +1,164 @@
+---
+title: "Text Clustering Case Study: 20 Newsgroups"
+author: "Dr. Stephen W. Thomas, Queen's University"
+date: "2017"
+output:
+  pdf_document:
+    highlight: pygments
+    number_sections: yes
+    toc: no
+    toc_depth: '2'
+---
+
+
+
+```{r}
+library(tidytext)
+library(RSentiment)
+library(cleanNLP)
+library(tidyr)
+library(dplyr)
+library(ggplot2)
+library(readr)
+library(lubridate)
+library(stringr)
+library(scales)
+library(tm)
+```
+
+# Read in the data
+
+```{r}
+news = read_csv("20_newsgroups.csv")
+
+# For now, just take a fraction
+news <- news %>%
+  sample_frac(0.05)
+
+# Inspect
+head(news)
+```
+
+```{r}
+
+
+# For now, we'll just use these categories
+# 9=rec.sport.baseball, 15= talk.religion.misc, 1=comp.graphics, 14=sci.space 
+categories = c(9, 15, 1, 14)
+
+news <- news %>%
+  filter(target %in% categories) %>% 
+  select(target, text)
+```
+
+
+# Convert to tidy text
+
+```{r}
+tidy <- news %>% 
+  unnest_tokens(word, text)
+tidy
+```
+
+
+# Some descriptive stats
+
+Most frequent words.
+```{r}
+word_freqs = tidy %>%
+  group_by(word) %>%
+  summarize(n = n()) %>%
+  arrange(desc(n))
+  
+word_freqs %>%
+  top_n(50)
+```
+
+
+Least frequent words 
+```{r}
+word_freqs %>%
+  top_n(-50)
+```
+
+
+Category distribution
+```{r}
+tidy %>%
+  group_by(target) %>%
+  summarize(n = n()) %>%
+  mutate(freq= n/sum(n))
+```
+
+# TODO: Words most skewed to certain categories
+Most positive and negative words
+```{r}
+sentiment_words_count = tidy %>% 
+  group_by(sentiment, word) %>%
+  summarize(count=n()) %>%
+  arrange(desc(count))
+
+log_ratios = sentiment_words_count %>% 
+  spread (sentiment, count) %>%
+  mutate(negative = ifelse(is.na(negative), 0, negative)) %>%
+  mutate(positive = ifelse(is.na(positive), 0, positive)) %>%
+  mutate(total=negative+positive) %>%
+  mutate(log_ratio = log2(positive/negative)) 
+
+# Save this for later, to be used as features in classification:
+# the most polarizing words
+top_log_ratios = log_ratios %>%
+  filter(total > 50) %>%
+  group_by(log_ratio < 0) %>%
+  top_n(40, abs(log_ratio)) %>%
+  ungroup() %>%
+  mutate(word = reorder(word, log_ratio))
+
+log_ratios %>%
+  filter(total > 50) %>%
+  group_by(log_ratio < 0) %>%
+  top_n(15, abs(log_ratio)) %>%
+  ungroup() %>%
+  mutate(word = reorder(word, log_ratio)) %>%
+  ggplot(aes(word, log_ratio, fill = log_ratio < 0)) +
+  geom_col() +
+  coord_flip() +
+  ylab("log odds ratio") +
+  scale_fill_discrete(name = "", labels = c("positive", "negative"))
+```
+
+
+Log odd ratio chart for n-grams
+
+```{r}
+tidy_tri <- imdb %>% 
+  unnest_tokens(word, review, token="ngrams", n=2)
+
+# Most positive and negative words
+sentiment_words_count_tri = tidy_tri %>% 
+  group_by(sentiment, word) %>%
+  summarize(count=n()) %>%
+  arrange(desc(count))
+
+log_ratios_tri = sentiment_words_count_tri %>% 
+  spread (sentiment, count) %>%
+  mutate(negative = ifelse(is.na(negative), 0, negative)) %>%
+  mutate(positive = ifelse(is.na(positive), 0, positive)) %>%
+  mutate(total=negative+positive) %>%
+  mutate(log_ratio = log2(positive/negative)) 
+
+log_ratios_tri %>%
+  filter(total > 100) %>%
+  group_by(log_ratio < 0) %>%
+  top_n(10, abs(log_ratio)) %>%
+  ungroup() %>%
+  mutate(word = reorder(word, log_ratio)) %>%
+  ggplot(aes(word, log_ratio, fill = log_ratio < 0)) +
+  geom_col() +
+  coord_flip() +
+  ylab("log odds ratio") +
+  scale_fill_discrete(name = "", labels = c("positive", "negative"))
+```
+
+
+# Do the clustering
