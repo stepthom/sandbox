@@ -37,6 +37,7 @@ news <- news %>%
 
 # Inspect
 head(news)
+
 ```
 
 ```{r}
@@ -47,18 +48,97 @@ head(news)
 categories = c(9, 15, 1, 14)
 
 news <- news %>%
-  filter(target %in% categories) %>% 
-  select(target, text)
+  filter(target %in% categories)
 ```
 
 
-# Convert to tidy text
+# Cleaning and Preprocessing
+
+Remove some noise like email headers and footers. This has to be done before tidying the text, because it
+is based on regular expression matching, which needs to work with full strings.
 
 ```{r}
+
+TODO: the below is Python; convert to R
+
+# Regex pattern for email addresses
+email_pattern = re.compile(r'[^@]+@[^@]+\.[^@]+', re.IGNORECASE & re.UNICODE)
+
+# Regex pattern for things found at the top "header" part of the message
+header_pattern = re.compile(
+    r'^summary:|^x-newsreader:.*|^date:.*'
+    r'|^disclaimer:.*|^distribution:.*|^organization:.*'
+    r'|^nntp-posting-host:.*|^keywords:.*|^to:.*'
+    r'|^in-reply-to:.*|^x-news-reader:.*|^lines:.*',
+    re.IGNORECASE & re.UNICODE)
+
+# Regex pattern for general special characters
+#special_char_pattern = re.compile(r'[\|=-\[\]\'\":;,\.\<\>\\\/\?_\(\)!$%^&*,]', re.IGNORECASE & re.UNICODE)
+special_char_pattern = re.compile(r"[^\w']|_")
+
+# Regex pattern for whole-word numbers
+number_pattern = re.compile(r'\b\d+\b')
+
+# Regex pattern to handle strings like the following:
+# In article <me@me.com> me@me.com (Me) writes:
+writes_pattern = re.compile(r'^.*writes:$')
+
+# Loop through data do the preprocessing
+for j in range(0, len(data.data)):
+    lines = data.data[j].lower().split("\n")
+    for i in range(0, len(lines)):
+
+        # Use the regexes above to remove bad things
+        lines[i] = header_pattern.sub(' ', lines[i])
+        lines[i] = email_pattern.sub(' ', lines[i])
+        lines[i] = number_pattern.sub(' ', lines[i])
+        lines[i] = writes_pattern.sub(' ', lines[i])
+        lines[i] = special_char_pattern.sub(' ', lines[i])
+
+        # Remove short words
+        lines[i] = ' '.join([w for w in lines[i].split() if len(w) > 2])
+
+        # Remove stopwords
+        lines[i] = ' '.join([w for w in lines[i].split() if w not in stopwords])
+
+        # Stem the words
+        lines[i] = ' '.join([nltk.stem.snowball.SnowballStemmer("english").stem(w) for w in lines[i].split()])
+
+        # Remove extra spaces, just for beauty
+        re.sub('\s\s+', " ", lines[i])
+
+    pre = " ".join(lines)
+    data.pre.append(pre)
+
+```
+
+
+Convert to tidy text.
+
+```{r}
+news
 tidy <- news %>% 
   unnest_tokens(word, text)
 tidy
 ```
+
+
+Remove stopwords.
+
+
+```{r}
+
+TODO: the below is Python; convert to R
+
+# A list of custom stopwords to remove
+stopwords = set(nltk.corpus.stopwords.words('english'))
+stopwords.update(
+    ['would', 'subject', 're', 'don', 'jan',
+     'feb', 'mar', 'apr', 'may', 'june',
+     'july', 'aug', 'sep', 'oct', 'nov', 'dec'])
+```
+
+
 
 
 # Some descriptive stats
@@ -83,6 +163,7 @@ word_freqs %>%
 
 
 Category distribution
+
 ```{r}
 tidy %>%
   group_by(target) %>%
@@ -90,75 +171,114 @@ tidy %>%
   mutate(freq= n/sum(n))
 ```
 
-# TODO: Words most skewed to certain categories
-Most positive and negative words
+
+
+# Build the DTM Matrix
 ```{r}
-sentiment_words_count = tidy %>% 
-  group_by(sentiment, word) %>%
-  summarize(count=n()) %>%
-  arrange(desc(count))
 
-log_ratios = sentiment_words_count %>% 
-  spread (sentiment, count) %>%
-  mutate(negative = ifelse(is.na(negative), 0, negative)) %>%
-  mutate(positive = ifelse(is.na(positive), 0, positive)) %>%
-  mutate(total=negative+positive) %>%
-  mutate(log_ratio = log2(positive/negative)) 
+tidy
 
-# Save this for later, to be used as features in classification:
-# the most polarizing words
-top_log_ratios = log_ratios %>%
-  filter(total > 50) %>%
-  group_by(log_ratio < 0) %>%
-  top_n(40, abs(log_ratio)) %>%
-  ungroup() %>%
-  mutate(word = reorder(word, log_ratio))
+tidy_counts = tidy %>%
+  group_by(id, target, word) %>%
+  summarize(count = n())
 
-log_ratios %>%
-  filter(total > 50) %>%
-  group_by(log_ratio < 0) %>%
-  top_n(15, abs(log_ratio)) %>%
-  ungroup() %>%
-  mutate(word = reorder(word, log_ratio)) %>%
-  ggplot(aes(word, log_ratio, fill = log_ratio < 0)) +
-  geom_col() +
-  coord_flip() +
-  ylab("log odds ratio") +
-  scale_fill_discrete(name = "", labels = c("positive", "negative"))
+tidy_counts
+
+# Make the DTM
+dtm <- tidy_counts %>%
+  cast_dtm(id, word, count)
+
+
+## Remove Stopwords
+dtm <- tm_map(dtm, removeWords, stopwords("english"))
+reuters[[1]]
+
+# Can optionally do some preprocessing using some functions in the tm package
+dtm <- removeSparseTerms(dtm, 0.7)
+#dtm <- removeNumbers(dtm)
+#dtm <- removePunctuation(dtm)
+
+dtm
+
+inspect(dtm)
+
+# Convert the dtm to a dataframe, so we can pass it into some classifiers
+df <- as.data.frame(as.matrix(dtm))
+
+head(df)
 ```
 
 
-Log odd ratio chart for n-grams
+# Run the clustering algorithm
 
 ```{r}
-tidy_tri <- imdb %>% 
-  unnest_tokens(word, review, token="ngrams", n=2)
-
-# Most positive and negative words
-sentiment_words_count_tri = tidy_tri %>% 
-  group_by(sentiment, word) %>%
-  summarize(count=n()) %>%
-  arrange(desc(count))
-
-log_ratios_tri = sentiment_words_count_tri %>% 
-  spread (sentiment, count) %>%
-  mutate(negative = ifelse(is.na(negative), 0, negative)) %>%
-  mutate(positive = ifelse(is.na(positive), 0, positive)) %>%
-  mutate(total=negative+positive) %>%
-  mutate(log_ratio = log2(positive/negative)) 
-
-log_ratios_tri %>%
-  filter(total > 100) %>%
-  group_by(log_ratio < 0) %>%
-  top_n(10, abs(log_ratio)) %>%
-  ungroup() %>%
-  mutate(word = reorder(word, log_ratio)) %>%
-  ggplot(aes(word, log_ratio, fill = log_ratio < 0)) +
-  geom_col() +
-  coord_flip() +
-  ylab("log odds ratio") +
-  scale_fill_discrete(name = "", labels = c("positive", "negative"))
+fit = kmeans(df, centers=5)
+fit
 ```
 
 
-# Do the clustering
+# Output some results
+
+```{r}
+
+fit <- skmeans(dtm, 3)
+fit
+
+mfrq_words_per_cluster(fit, dtm)
+
+
+library(cluster) 
+table(fit$cluster)
+clusplot(df, fit$cluster, color=TRUE, shade=TRUE,  labels=2, lines=0)
+```
+
+```{r}
+mfrq_words_per_cluster <- function(fit, dtm, first = 10, unique = TRUE){
+
+  dtm <- as.simple_triplet_matrix(dtm)
+  indM <- table(names(fit$cluster), fit$cluster) == 1 # generate bool matrix
+  indM
+  
+  table(names(fit$cluster), fit$cluster)
+
+  hfun <- function(ind, dtm){ # help function, summing up words
+    if(is.null(dtm[ind, ]))  dtm[ind, ] else  col_sums(dtm[ind, ])
+  }
+  frqM <- apply(indM, 2, hfun, dtm = dtm)
+  
+  frqM
+  
+  rowSums(frqM > 0)
+
+  #if(unique){
+    # eliminate word which occur in several clusters
+   # frqM <- frqM[rowSums(frqM > 0) == 1, ] 
+  #}
+  # export to list, order and take first x elements 
+  res <- lapply(1:ncol(frqM), function(i, mat, first)
+                head(sort(mat[, i], decreasing = TRUE), first),
+                mat = frqM, first = first)
+  res
+}
+```
+
+
+```{r}
+data("crude")
+
+dtm <- DocumentTermMatrix(crude, control =
+                          list(removePunctuation = TRUE,
+                               removeNumbers = TRUE,
+                               stopwords = TRUE))
+
+rownames(dtm) <- paste0("Doc_", 1:20)
+
+library(skmeans)
+library(slam)
+clus <- skmeans(dtm, 3)
+clus
+
+mfrq_words_per_cluster(clus, dtm)
+mfrq_words_per_cluster(clus, dtm, unique = FALSE)
+
+```
