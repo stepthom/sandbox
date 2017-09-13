@@ -1,0 +1,63 @@
+---
+title: "Data for slides"
+author: "Dr. Stephen W. Thomas, Queen's University"
+date: "2017"
+output:
+  pdf_document:
+    highlight: pygments
+    number_sections: yes
+    toc: no
+    toc_depth: '2'
+---
+
+
+
+```{r}
+library(tidytext)
+library(tidyr)
+library(dplyr)
+library(ggplot2)
+library(readr)
+library(tm)
+```
+
+```{r}
+
+lexicon = data_frame(
+  word=c("monstrosity", "hate", "disgust", "sham", "inspire", "beautiful", "like", "relish", "masterpiece"),
+  score=c(-5, -4, -3, -2, 1, 2, 3, 4, 5))
+
+lexicon
+```
+
+
+```{r}
+df = data_frame(doc_id=c(231,232, 233, 234), 
+                  text=c("I really like princess elsa. she's so beautiful!",
+                         "I hate Tom Cruise. He disgusts me.",
+                         "Nobody gives a good performance in this movie.",
+                         "I really enjoyed the film")
+)
+df
+```
+
+```{r}
+tidy <- df %>% 
+  filter(doc_id==231) %>%
+  unnest_tokens(word, text)
+tidy
+```
+
+
+
+```{r}
+tidy %>%
+  inner_join(lexicon, by=c("word"))
+```
+
+```{r}
+tidy %>%
+  inner_join(lexicon, by=c("word")) %>%
+  group_by(doc_id) %>%
+  summarise(sentiment_score=sum(score))
+````

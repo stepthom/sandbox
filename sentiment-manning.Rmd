@@ -140,6 +140,7 @@ sents = text_df %>%
   spread(sentiment, n, fill = 0) %>%
   mutate(sentiment = positive - negative) %>%
   arrange(sentiment)
+sents
 ```
 
 

@@ -26,29 +26,67 @@ library(scales)
 library(tm)
 ```
 
+
+# Create the CSV file
+
+```{r}
+# Note: I already ran this; you don't need to run it again.
+
+# Downloaded the tarball from: http://qwone.com/~jason/20Newsgroups/20news-18828.tar.gz
+dir = '20news-18828'
+cats = list.files(file.path(dir))
+df = data.frame(matrix(ncol = 3, nrow = 0))
+colnames(df) = c("category", "id", "text")
+for (cat in cats) {
+  print(cat)
+  files = list.files(file.path(dir, cat))
+  for (file in files){
+    fileName = file.path(dir, cat, file)
+    print(fileName)
+    text = readChar(fileName, file.info(fileName)$size)
+    df[nrow(df) + 1,] = c(cat, file, text)
+  }
+}
+head(df)
+
+# Put actual newlines in, not the characters
+df$text = gsub("\\n", "\n", df$text)
+
+Encoding(df$text) <- "UTF-8"
+df$text = iconv(df$text, "UTF-8", "UTF-8", sub='') ## replace any non UTF-8 by ''
+
+write_csv(df, "20newsgroup.csv")
+```
+
+
 # Read in the data
 
 ```{r}
-news = read_csv("20_newsgroups.csv")
-
+news = read_csv("20newsgroup.csv")
 # For now, just take a fraction
+
+set.seed(123)
 news <- news %>%
-  sample_frac(0.05)
+  sample_frac(0.25)
 
 # Inspect
 head(news)
 
 ```
 
+Filter by category
+
 ```{r}
-
-
 # For now, we'll just use these categories
-# 9=rec.sport.baseball, 15= talk.religion.misc, 1=comp.graphics, 14=sci.space 
-categories = c(9, 15, 1, 14)
+categories = c('rec.sport.baseball', 'talk.religion.misc', 'comp.graphics', 'sci.space')
 
 news <- news %>%
-  filter(target %in% categories)
+  filter(category %in% categories)
+
+news %>%
+  group_by(category) %>%
+  summarize(n = n()) %>%
+  mutate(freq= n/sum(n))
 ```
 
 
@@ -58,58 +96,82 @@ Remove some noise like email headers and footers. This has to be done before tid
 is based on regular expression matching, which needs to work with full strings.
 
 ```{r}
+head(news)
 
-TODO: the below is Python; convert to R
+news$text_pre = news$text
 
-# Regex pattern for email addresses
-email_pattern = re.compile(r'[^@]+@[^@]+\.[^@]+', re.IGNORECASE & re.UNICODE)
+news$text_pre <- gsub('^From:.*\n', "", news$text_pre, ignore.case=TRUE, perl=TRUE)
+news$text_pre <- gsub('\nin-reply-to:.*\n', "", news$text_pre, ignore.case=TRUE, perl=TRUE)
+news$text_pre <- gsub('\n.*writes:\n', "", news$text_pre, ignore.case=TRUE, perl=TRUE) 
+news$text_pre <- gsub('\\S+@\\S+|\\{(?:\\w+, *)+\\w+\\}@[\\w.-]+', "", news$text_pre, ignore.case=TRUE, perl=TRUE) 
+head(news)
 
-# Regex pattern for things found at the top "header" part of the message
-header_pattern = re.compile(
-    r'^summary:|^x-newsreader:.*|^date:.*'
-    r'|^disclaimer:.*|^distribution:.*|^organization:.*'
-    r'|^nntp-posting-host:.*|^keywords:.*|^to:.*'
-    r'|^in-reply-to:.*|^x-news-reader:.*|^lines:.*',
-    re.IGNORECASE & re.UNICODE)
 
-# Regex pattern for general special characters
-#special_char_pattern = re.compile(r'[\|=-\[\]\'\":;,\.\<\>\\\/\?_\(\)!$%^&*,]', re.IGNORECASE & re.UNICODE)
-special_char_pattern = re.compile(r"[^\w']|_")
+news$text[3]
 
-# Regex pattern for whole-word numbers
-number_pattern = re.compile(r'\b\d+\b')
+```
 
-# Regex pattern to handle strings like the following:
-# In article <me@me.com> me@me.com (Me) writes:
-writes_pattern = re.compile(r'^.*writes:$')
 
-# Loop through data do the preprocessing
-for j in range(0, len(data.data)):
-    lines = data.data[j].lower().split("\n")
-    for i in range(0, len(lines)):
 
-        # Use the regexes above to remove bad things
-        lines[i] = header_pattern.sub(' ', lines[i])
-        lines[i] = email_pattern.sub(' ', lines[i])
-        lines[i] = number_pattern.sub(' ', lines[i])
-        lines[i] = writes_pattern.sub(' ', lines[i])
-        lines[i] = special_char_pattern.sub(' ', lines[i])
+```{r}
+corpus <- (VectorSource(news$text_pre))
+corpus <- Corpus(corpus)
+summary(corpus)
 
-        # Remove short words
-        lines[i] = ' '.join([w for w in lines[i].split() if len(w) > 2])
+inspect(corpus[1])
+inspect(corpus[10])
 
-        # Remove stopwords
-        lines[i] = ' '.join([w for w in lines[i].split() if w not in stopwords])
 
-        # Stem the words
-        lines[i] = ' '.join([nltk.stem.snowball.SnowballStemmer("english").stem(w) for w in lines[i].split()])
+```
 
-        # Remove extra spaces, just for beauty
-        re.sub('\s\s+', " ", lines[i])
+```{r}
+custom_stop_words = c('would', 'subject', 'from', 're', 'don', 'jan',
+     'feb', 'mar', 'apr', 'may', 'june',
+     'july', 'aug', 'sep', 'oct', 'nov', 'dec', 'yes', 'no',  'cant', 'can', 'say', 'said', 'one')
 
-    pre = " ".join(lines)
-    data.pre.append(pre)
+corpus <- tm_map(corpus, content_transformer(tolower))
+inspect(corpus[10])
+corpus <- tm_map(corpus, content_transformer(removePunctuation))
+inspect(corpus[10])
+corpus <- tm_map(corpus, stripWhitespace) 
+inspect(corpus[10])
+corpus <- tm_map(corpus, content_transformer(removeNumbers))
+inspect(corpus[10])
+corpus <- tm_map(corpus, content_transformer(removeWords), stopwords("english"))
+inspect(corpus[10])
+corpus <- tm_map(corpus, content_transformer(removeWords), custom_stop_words)
+inspect(corpus[10])
+corpus <- tm_map(corpus, stemDocument)
+inspect(corpus[10])
 
+
+dtm <- DocumentTermMatrix(corpus,
+    control = list(weighting =
+    function(x)
+        weightTfIdf(x, normalize = FALSE),
+        stopwords = FALSE))
+
+
+inspect(dtm)
+dtm <- removeSparseTerms(dtm, 0.95)
+inspect(dtm)
+sort(colnames(df))
+
+
+df <- as.data.frame(as.matrix(dtm))
+set.seed(123)
+fit = kmeans(df, centers=5)
+cluster_names = lapply(1:nrow(fit$centers), function(x) names(head(sort(fit$centers[x,], decreasing=TRUE), 6)))
+cluster_names
+
+sort(colnames(df))
+stopwords("english")
+
+
+dataframe <- data.frame(text=sapply(corpus, identity), 
+    stringsAsFactors=F)
+
+dataframe
 ```
 
 
@@ -118,27 +180,10 @@ Convert to tidy text.
 ```{r}
 news
 tidy <- news %>% 
-  unnest_tokens(word, text)
+  select(-text) %>%
+  unnest_tokens(word, text_pre)
 tidy
 ```
-
-
-Remove stopwords.
-
-
-```{r}
-
-TODO: the below is Python; convert to R
-
-# A list of custom stopwords to remove
-stopwords = set(nltk.corpus.stopwords.words('english'))
-stopwords.update(
-    ['would', 'subject', 're', 'don', 'jan',
-     'feb', 'mar', 'apr', 'may', 'june',
-     'july', 'aug', 'sep', 'oct', 'nov', 'dec'])
-```
-
-
 
 
 # Some descriptive stats
@@ -162,15 +207,6 @@ word_freqs %>%
 ```
 
 
-Category distribution
-
-```{r}
-tidy %>%
-  group_by(target) %>%
-  summarize(n = n()) %>%
-  mutate(freq= n/sum(n))
-```
-
 
 
 # Build the DTM Matrix
@@ -190,11 +226,9 @@ dtm <- tidy_counts %>%
 
 
 ## Remove Stopwords
-dtm <- tm_map(dtm, removeWords, stopwords("english"))
-reuters[[1]]
 
 # Can optionally do some preprocessing using some functions in the tm package
-dtm <- removeSparseTerms(dtm, 0.7)
+dtm <- removeSparseTerms(dtm, 0.9)
 #dtm <- removeNumbers(dtm)
 #dtm <- removePunctuation(dtm)
 
@@ -205,6 +239,7 @@ inspect(dtm)
 # Convert the dtm to a dataframe, so we can pass it into some classifiers
 df <- as.data.frame(as.matrix(dtm))
 
+dim(df)
 head(df)
 ```
 
@@ -212,8 +247,11 @@ head(df)
 # Run the clustering algorithm
 
 ```{r}
-fit = kmeans(df, centers=5)
-fit
+dtm <- removeSparseTerms(dtm, 0.9)
+df <- as.data.frame(as.matrix(dtm))
+fit = kmeans(df, centers=4)
+cluster_names = lapply(1:nrow(fit$centers), function(x) names(head(sort(fit$centers[x,], decreasing=TRUE), 6)))
+cluster_names
 ```
 
 
@@ -221,7 +259,7 @@ fit
 
 ```{r}
 
-fit <- skmeans(dtm, 3)
+fit <- skmeans(dtm, 4)
 fit
 
 mfrq_words_per_cluster(fit, dtm)
@@ -234,6 +272,9 @@ clusplot(df, fit$cluster, color=TRUE, shade=TRUE,  labels=2, lines=0)
 
 ```{r}
 mfrq_words_per_cluster <- function(fit, dtm, first = 10, unique = TRUE){
+  
+  first=10
+  unique=TRUE
 
   dtm <- as.simple_triplet_matrix(dtm)
   indM <- table(names(fit$cluster), fit$cluster) == 1 # generate bool matrix
@@ -248,7 +289,13 @@ mfrq_words_per_cluster <- function(fit, dtm, first = 10, unique = TRUE){
   
   frqM
   
-  rowSums(frqM > 0)
+  rowSums(frqM > 0) ==1
+  
+  i = 1
+  mat = frqM
+  mat
+  mat[,i]
+  head(sort(mat[, i], decreasing = TRUE), 10)[1]
 
   #if(unique){
     # eliminate word which occur in several clusters
