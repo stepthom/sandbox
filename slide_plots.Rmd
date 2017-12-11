@@ -1,0 +1,174 @@
+---
+title: "Data for slides"
+author: "Dr. Stephen W. Thomas, Queen's University"
+date: "2017"
+output:
+  pdf_document:
+    highlight: pygments
+    number_sections: yes
+    toc: no
+    toc_depth: '2'
+---
+
+
+
+```{r}
+library(tidytext)
+library(tidyr)
+library(dplyr)
+library(ggplot2)
+library(readr)
+library(tm)
+```
+
+
+
+## Crickets
+
+```{r}
+dat <- read_csv("chirps.csv")
+
+
+theme_set(theme_gray(base_size = 22))
+ggplot(dat, aes(x=Chirps, y=Temp)) + geom_point(size=6)
+
+ggplot(dat, aes(x=Chirps, y=Temp)) + geom_point(size=3) + geom_smooth(method=lm)
+```
+
+
+```{r}
+
+library(car)
+library(stargazer)
+
+Prestige <-read.table("Prestige.txt", header=TRUE)
+head(Prestige, n=20)
+Prestige[1:30, 1:2]
+str(Prestige)
+summary(Prestige$education)
+scatterplotMatrix(~ prestige + income +education + women, span =0.7, data = Prestige)
+
+prestige.mod1 <- lm(income ~ education, data= Prestige)
+
+summary(prestige.mod1)
+
+theme_set(theme_gray(base_size = 22))
+ggplot(Prestige, aes(x=education, y=income)) + geom_point(size=6)
+ggsave("income_1.pdf")
+
+ggplot(Prestige, aes(x=education, y=income)) + geom_point(size=6) + geom_smooth(method = lm)
+ggsave("income_2.pdf")
+```
+
+
+```{r}
+library(ggplot2)
+
+library(readr)
+dat <- read_csv("clusters.csv")
+
+# Temp hack: make these age and income, just from experimentation
+dat$age = dat$height*10 + 15
+dat$income = dat$weight*20000
+
+
+iwidth = 7
+iheight = 7
+
+theme_set(theme_gray(base_size = 22))
+ggplot(dat, aes(x=age, y=income)) + geom_point(aes(color=factor(truth)), size=6) + theme(legend.position="none")
+ggsave(file="cluster_1.pdf", width=iwidth, height=iheight)
+
+theme_set(theme_gray(base_size = 22))
+ggplot(dat, aes(x=age, y=income)) + geom_point(color="black", size=6)
+ggsave(file="cluster_2.pdf", width=iwidth, height=iheight)
+```
+
+
+```{r}
+getRandomDat = function(rho) {
+  n     <- 50                    # length of vector
+  #rho   <- 0.8                   # desired correlation = cos(angle)
+  theta <- acos(rho)             # corresponding angle
+  x1    <- rnorm(n, 1, 1)        # fixed given data
+  x2    <- rnorm(n, 2, 0.5)      # new random data
+  X     <- cbind(x1, x2)         # matrix
+  Xctr  <- scale(X, center=TRUE, scale=FALSE)   # centered columns (mean 0)
+  
+  Id   <- diag(n)                               # identity matrix
+  Q    <- qr.Q(qr(Xctr[ , 1, drop=FALSE]))      # QR-decomposition, just matrix Q
+  P    <- tcrossprod(Q)          # = Q Q'       # projection onto space defined by x1
+  x2o  <- (Id-P) %*% Xctr[ , 2]                 # x2ctr made orthogonal to x1ctr
+  Xc2  <- cbind(Xctr[ , 1], x2o)                # bind to matrix
+  Y    <- Xc2 %*% diag(1/sqrt(colSums(Xc2^2)))  # scale columns to length 1
+  
+  x3 <- Y[ , 2] + (1 / tan(theta)) * Y[ , 1]     # final new vector
+  as.data.frame(cbind(x1, x3))
+}
+
+iwidth = 4
+iheight = 4
+
+dat1 = getRandomDat(-0.8)
+
+theme_set(theme_gray(base_size = 20))
+ggplot(dat1, aes(x=x1, y=x3)) + labs(x = "Auto Mileage", y ="Auto Value") + geom_point(color="black", size=3) +
+  theme(axis.text.x=element_blank(),axis.ticks.x=element_blank(), axis.text.y=element_blank(), axis.ticks.y = element_blank())
+ggsave(file="cor_neg.png", width=iwidth, height=iheight)
+
+dat2 = getRandomDat(0.0)
+
+theme_set(theme_gray(base_size = 20))
+ggplot(dat2, aes(x=x1, y=x3)) + labs(x = "Auto Color", y ="Air Quality") + geom_point(color="black", size=3) +
+  theme(axis.text.x=element_blank(),axis.ticks.x=element_blank(), axis.text.y=element_blank(), axis.ticks.y = element_blank())
+ggsave(file="cor_none.png", width=iwidth, height=iheight)
+
+dat3 = getRandomDat(0.9)
+
+theme_set(theme_gray(base_size = 20))
+ggplot(dat3, aes(x=x1, y=x3)) + labs(x = "Auto Accidents", y ="Insurance Cost") + geom_point(color="black", size=3) +
+  theme(axis.text.x=element_blank(),axis.ticks.x=element_blank(), axis.text.y=element_blank(), axis.ticks.y = element_blank())
+ggsave(file="cor_pos.png", width=iwidth, height=iheight)
+
+```
+
+
+
+```{r}
+iwidth = 4
+iheight = 4
+
+dat1 = getRandomDat(-0.8)
+
+theme_set(theme_gray(base_size = 20))
+ggplot(dat1, aes(x=x1, y=x3)) + labs(x = "Auto Mileage", y ="Auto Value") + geom_point(color="black", size=3) +
+  theme(axis.text.x=element_blank(),axis.ticks.x=element_blank(), axis.text.y=element_blank(), axis.ticks.y = element_blank())
+ggsave(file="cor_neg.png", width=iwidth, height=iheight)
+
+dat2 = getRandomDat(0.0)
+
+theme_set(theme_gray(base_size = 20))
+ggplot(dat2, aes(x=x1, y=x3)) + labs(x = "Auto Color", y ="Air Quality") + geom_point(color="black", size=3) +
+  theme(axis.text.x=element_blank(),axis.ticks.x=element_blank(), axis.text.y=element_blank(), axis.ticks.y = element_blank())
+ggsave(file="cor_none.png", width=iwidth, height=iheight)
+
+dat3 = getRandomDat(0.9)
+
+theme_set(theme_gray(base_size = 20))
+ggplot(dat3, aes(x=x1, y=x3)) + labs(x = "Auto Accidents", y ="Insurance Cost") + geom_point(color="black", size=3) +
+  theme(axis.text.x=element_blank(),axis.ticks.x=element_blank(), axis.text.y=element_blank(), axis.ticks.y = element_blank())
+ggsave(file="cor_pos.png", width=iwidth, height=iheight)
+```
+
+
+
+```{r}
+df = data.frame(replicate(10,sample(0:1,9,rep=TRUE)))
+df[1,1] = "hello this is steve"
+df[2,1] = "is there anything"
+df[3,1] = "how now brown cow"
+df[4,1] = "the man had feet"
+
+vs <- VectorSource(df[,1])
+c <- SimpleCorpus(vs)
+```
