@@ -1,0 +1,120 @@
+---
+title: "Data for slides"
+author: "Dr. Stephen W. Thomas, Queen's University"
+date: "2017"
+output:
+  pdf_document:
+    highlight: pygments
+    number_sections: yes
+    toc: no
+    toc_depth: '2'
+---
+
+
+
+```{r}
+library(tidytext)
+library(tidyr)
+library(dplyr)
+library(ggplot2)
+library(readr)
+library(tm)
+library(jsonlite)
+library(rjson)
+library(data.table)
+```
+
+
+# Read in the data
+
+```{r}
+
+# The file is, for some reason, in a strange format, where each line is its own JSON.
+dat_full <- lapply(readLines('reviews_Grocery_and_Gourmet_Food_5.json'), fromJSON)
+
+# The following calls fail with parse errors, due to the above
+#dat = read_json('reviews_Grocery_and_Gourmet_Food_5.json', simplifyVector = TRUE)
+#dat = fromJSON(file='reviews_Grocery_and_Gourmet_Food_5.json')
+
+
+str(dat_full)
+
+# Take a sample of the data, just for ease of use
+n = 5000
+dat = sample(dat_full, n)
+str(dat)
+
+# Create a dataframe out of the data.
+# (Actually, use a data.table for speed. Also use the set() method for great speedup.)
+# The following code is an ugly hack. Unfortunately, simple methods like as.data.frame were not working,
+# and in the interest of time, I just brute forced the creation of a dataframe by looping through
+# the list of json docs manually.
+df = data.table(
+  reviewerID = rep("", n),
+  asin = rep("", n),
+  reviewerName = rep("", n),
+  reviewText = rep("", n),
+  overall = rep(-1L, n) ,
+  summary = rep("", n),
+  unixReviewTime = rep(-1L, n),
+  stringsAsFactors = FALSE
+  )
+
+i = 1L
+for (u in dat) {
+  # Some reviews have a NULL/empty reviewer name.
+  if (!exists("reviewerName", where = u)) {
+    rn = ""
+  } else {
+    rn = u$reviewerName
+  }
+  set(df, i=i, j=1L, value=u$reviewerID)
+  set(df, i=i, j=2L, value=u$asin)
+  set(df, i=i, j=3L, value=rn)
+  set(df, i=i, j=4L, value=u$reviewText)
+  set(df, i=i, j=5L, value=u$overall)
+  set(df, i=i, j=6L, value=u$summary)
+  set(df, i=i, j=7L, value=u$unixReviewTime)
+  i = i+1L
+}
+
+head(df)
+str(df)
+```
+
+
+
+
+# Create tidy format.
+```{r}
+text_df <- df %>% 
+  unnest_tokens(word, reviewText)
+```
+
+
+# Uni-gram frequency analysis
+
+```{r}
+text_df %>%
+  anti_join(stop_words, by=c("word"="word")) %>%
+  count(word, sort=TRUE)
+```
+
+# N-Gram analysis
+
+```{r}
+
+text_bigrams <- df %>%
+  unnest_tokens(bigram, reviewText, token = "ngrams", n = 3)
+
+text_bigrams %>%
+  filter(grepl("good$", bigram)) %>%
+  count(bigram, sort=TRUE)
+
+text_bigrams %>%
+  filter(grepl("bad$", bigram)) %>%
+  count(bigram, sort=TRUE)
+
+text_bigrams %>%
+  count(bigram, sort=TRUE)
+```
