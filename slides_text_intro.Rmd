@@ -45,7 +45,7 @@ dat_full <- lapply(readLines('reviews_Grocery_and_Gourmet_Food_5_50000.json'), f
 
 # Take a sample of the data, just for ease of use
 sample = FALSE
-if (sample = TRUE) {
+if (sample == TRUE) {
   n = 5000
   set.seed(1111)
   dat = sample(dat_full, n)
@@ -61,6 +61,7 @@ if (sample = TRUE) {
 # and in the interest of time, I just brute forced the creation of a dataframe by looping through
 # the list of json docs manually.
 df_a = data.table(
+  reviewID = rep(1L, n),
   reviewerID = rep("", n),
   asin = rep("", n),
   reviewerName = rep("", n),
@@ -79,13 +80,14 @@ for (u in dat) {
   } else {
     rn = u$reviewerName
   }
-  set(df_a, i=i, j=1L, value=u$reviewerID)
-  set(df_a, i=i, j=2L, value=u$asin)
-  set(df_a, i=i, j=3L, value=rn)
-  set(df_a, i=i, j=4L, value=u$reviewText)
-  set(df_a, i=i, j=5L, value=u$overall)
-  set(df_a, i=i, j=6L, value=u$summary)
-  set(df_a, i=i, j=7L, value=u$unixReviewTime)
+  set(df_a, i=i, j=1L, value=i)
+  set(df_a, i=i, j=2L, value=u$reviewerID)
+  set(df_a, i=i, j=3L, value=u$asin)
+  set(df_a, i=i, j=4L, value=rn)
+  set(df_a, i=i, j=5L, value=u$reviewText)
+  set(df_a, i=i, j=6L, value=u$overall)
+  set(df_a, i=i, j=7L, value=u$summary)
+  set(df_a, i=i, j=8L, value=u$unixReviewTime)
   i = i+1L
 }
 
@@ -94,6 +96,9 @@ head(df_a)
 str(df_a)
 
 df_a[4,]$reviewText
+
+df_a %>%
+  filter(reviewID==24327)
 ```
 
 
@@ -138,59 +143,119 @@ text_df_a %>%
 ggsave(file="amazon_food_1.pdf", width=iwidth, height=iheight)
 ```
 
+
+## Word frequency density plot
+
 ```{r}
 
-# Get the counts for the words; only save top 2000 because otherwise ggplot2 has some scalability
-# issues
 tmp = text_df_a %>%
-  anti_join(stop_words, by=c("word"="word")) %>%
-  count(word, sort=TRUE) %>%
-  head(2000)
+  count(word, sort=TRUE)
 
 head(tmp)
+dim(tmp)
 
-tmp %>%
-  filter(word=="celiac")
-
-# Select some labels (words) to display on the x-axis, so it doesn't get too crowded
-idx = seq(1, length(tmp$word), length.out=19)
-labels = tmp$word[idx]
-
-labels[length(labels)] = "" # Last label gets cut off; just set it to blank
-labels
-
-# Also, show some counts on top of the bars, just for fun
-dfLab = data.table(x=tmp$word[idx], y=tmp$n[idx], lab=as.character(tmp$n[idx]), stringsAsFactors = FALSE)
-str(dfLab)
-dfLab = dfLab[3:nrow(dfLab)-1,] # First and last number don't need to be shown (they get cut off)
 
 iwidth = 9
 iheight = 5
 
 theme_set(theme_gray(base_size = 18))
 
-
-tmp  %>%
+tmp %>%
+  filter(n > 1) %>%
   ggplot(aes(reorder(word, -n), n)) +
-  geom_freqpoly() 
-
-+
-  scale_x_discrete(breaks=labels, labels=labels)) +
-  theme(axis.text.x = element_text(angle = 90, hjust = 1), axis.ticks = element_blank()) + 
-  labs(x = "word (ordered)", y = "count") + 
-  geom_text(data=dfLab, aes(x=x, y=y, label=lab), vjust=-1)
-
-
-
-tmp  %>%
-  ggplot(aes(reorder(word, -n), n)) +
-  geom_col() +
-  scale_x_discrete(breaks=labels, labels=labels)) +
-  theme(axis.text.x = element_text(angle = 90, hjust = 1), axis.ticks = element_blank()) + 
-  labs(x = "word (ordered)", y = "count") + 
-  geom_text(data=dfLab, aes(x=x, y=y, label=lab), vjust=-1)
+  geom_col() + 
+  theme(axis.text.x = element_blank(), axis.ticks = element_blank()) + 
+  labs (x = "rank", y = "count") +
+  scale_y_log10()
 
 ggsave(file="amazon_food_hist.pdf", width=iwidth, height=iheight)
+```
+
+
+## Word frequency for a certain target (i.e., rating).
+```{r}
+
+iwidth = 7
+iheight = 7
+
+theme_set(theme_gray(base_size = 18))
+
+text_df_a %>%
+  filter(overall >= 3) %>%
+  anti_join(stop_words, by=c("word"="word")) %>%
+  count(word, sort=TRUE) %>%
+  top_n(20) %>%
+  ggplot(aes(reorder(word, n), n)) +
+  geom_col() +
+  labs(x = NULL, y = "n") +
+  coord_flip()
+
+
+ggsave(file="amazon_good.pdf", width=iwidth, height=iheight)
+
+text_df_a %>%
+  filter(overall < 3) %>%
+  anti_join(stop_words, by=c("word"="word")) %>%
+  count(word, sort=TRUE) %>%
+  top_n(20) %>%
+  ggplot(aes(reorder(word, n), n)) +
+  geom_col() +
+  labs(x = NULL, y = "n") +
+  coord_flip()
+
+
+ggsave(file="amazon_bad.pdf", width=iwidth, height=iheight)
+```
+
+
+## Log ratios
+
+```{r}
+
+tmp = text_df_a %>%
+  mutate(overall_str = ifelse(overall >= 3, "positive", "negative"))
+
+
+status_words_count = tmp %>% group_by(overall_str, word) %>%
+  summarize(count=n()) %>%
+  arrange(desc(count))
+
+head(status_words_count)
+
+log_ratios = status_words_count %>% 
+  spread (overall_str, count) %>%
+  mutate(negative = ifelse(is.na(negative), 0, negative)) %>%
+  mutate(positive = ifelse(is.na(positive), 0, positive)) %>%
+  mutate(total=negative+positive) %>%
+  mutate(log_ratio = log2((positive+1)/(negative+1))) 
+
+log_ratios
+
+log_ratios %>%
+  filter(total > 50) %>%
+  group_by(log_ratio < 0) %>%
+  top_n(15, abs(log_ratio))
+
+
+iwidth = 9
+iheight = 5
+
+theme_set(theme_gray(base_size = 18))
+
+log_ratios %>%
+  filter(total > 100) %>%
+  group_by(log_ratio < 0) %>%
+  top_n(20, abs(log_ratio)) %>%
+  ungroup() %>%
+  mutate(word = reorder(word, log_ratio)) %>%
+  ggplot(aes(word, log_ratio, fill = log_ratio > 0)) +
+  geom_col() +
+  coord_flip() +
+  ylab("log odds ratio") +
+  scale_fill_discrete(name = "", labels = c("negative", "positive"))
+
+
+ggsave(file="amazon_food_logodds.pdf", width=iwidth, height=iheight)
 ```
 
 ## N-Gram analysis
@@ -199,6 +264,37 @@ ggsave(file="amazon_food_hist.pdf", width=iwidth, height=iheight)
 
 text_bigrams_a <- df_a %>%
   unnest_tokens(bigram, reviewText, token = "ngrams", n = 3)
+
+
+iwidth = 7
+iheight = 7
+
+theme_set(theme_gray(base_size = 18))
+
+text_bigrams_a %>%
+  count(bigram, sort=TRUE) %>%
+  top_n(20) %>%
+  ggplot(aes(reorder(bigram, n), n)) +
+  geom_col() +
+  labs(x = NULL, y = "n") +
+  coord_flip()
+
+ggsave(file="amazon_food_3gram.pdf", width=iwidth, height=iheight)
+
+iwidth = 7
+iheight = 7
+
+theme_set(theme_gray(base_size = 18))
+
+text_bigrams_a %>%
+  count(bigram, sort=TRUE) %>%
+  top_n(20) %>%
+  ggplot(aes(reorder(bigram, n), n)) +
+  geom_col() +
+  labs(x = NULL, y = "n") +
+  coord_flip()
+
+ggsave(file="amazon_food_3gram.pdf", width=iwidth, height=iheight)
 
 text_bigrams_a %>%
   filter(grepl("good$", bigram)) %>%
@@ -273,7 +369,33 @@ text_df_r %>%
 ggsave(file="reuters_1.pdf", width=iwidth, height=iheight)
 ```
 
-Words for a certain topic.
+## Word frequency density plot
+
+```{r}
+tmp = text_df_r %>%
+  count(word, sort=TRUE)
+
+head(tmp)
+dim(tmp)
+
+iwidth = 9
+iheight = 5
+
+theme_set(theme_gray(base_size = 18))
+
+tmp %>%
+  filter(n > 1) %>%
+  ggplot(aes(reorder(word, -n), n)) +
+  geom_col() + 
+  theme(axis.text.x = element_blank(), axis.ticks = element_blank()) + 
+  labs (x = "rank", y = "count") +
+  scale_y_log10()
+
+ggsave(file="reuters_hist.pdf", width=iwidth, height=iheight)
+```
+
+
+## Word frequency for a certain target (i.e., retuers topic).
 ```{r}
 
 iwidth = 7
@@ -293,6 +415,20 @@ text_df_r %>%
 
 
 ggsave(file="reuters_coffee.pdf", width=iwidth, height=iheight)
+
+
+text_df_r %>%
+  filter(topic.housing == 1) %>%
+  anti_join(stop_words, by=c("word"="word")) %>%
+  count(word, sort=TRUE) %>%
+  top_n(20) %>%
+  ggplot(aes(reorder(word, n), n)) +
+  geom_col() +
+  labs(x = NULL, y = "n") +
+  coord_flip()
+
+
+ggsave(file="reuters_housing.pdf", width=iwidth, height=iheight)
 ```
 
 ## N-Gram analysis
