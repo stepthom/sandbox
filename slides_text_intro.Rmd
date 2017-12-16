@@ -24,32 +24,43 @@ library(rjson)
 library(data.table)
 ```
 
+# Amazon Reviews
 
-# Read in the data
+## Read in the data
 
 ```{r}
 
 # The file is, for some reason, in a strange format, where each line is its own JSON.
-dat_full <- lapply(readLines('reviews_Grocery_and_Gourmet_Food_5.json'), fromJSON)
+dat_full <- lapply(readLines('reviews_Grocery_and_Gourmet_Food_5_50000.json'), fromJSON)
 
 # The following calls fail with parse errors, due to the above
 #dat = read_json('reviews_Grocery_and_Gourmet_Food_5.json', simplifyVector = TRUE)
 #dat = fromJSON(file='reviews_Grocery_and_Gourmet_Food_5.json')
+```
 
 
-str(dat_full)
+## Take a sample
+
+```{r}
 
 # Take a sample of the data, just for ease of use
-n = 5000
-dat = sample(dat_full, n)
-str(dat)
+sample = FALSE
+if (sample = TRUE) {
+  n = 5000
+  set.seed(1111)
+  dat = sample(dat_full, n)
+} else {
+  n = length(dat_full)
+  dat = dat_full
+}
+
 
 # Create a dataframe out of the data.
 # (Actually, use a data.table for speed. Also use the set() method for great speedup.)
 # The following code is an ugly hack. Unfortunately, simple methods like as.data.frame were not working,
 # and in the interest of time, I just brute forced the creation of a dataframe by looping through
 # the list of json docs manually.
-df = data.table(
+df_a = data.table(
   reviewerID = rep("", n),
   asin = rep("", n),
   reviewerName = rep("", n),
@@ -68,53 +79,241 @@ for (u in dat) {
   } else {
     rn = u$reviewerName
   }
-  set(df, i=i, j=1L, value=u$reviewerID)
-  set(df, i=i, j=2L, value=u$asin)
-  set(df, i=i, j=3L, value=rn)
-  set(df, i=i, j=4L, value=u$reviewText)
-  set(df, i=i, j=5L, value=u$overall)
-  set(df, i=i, j=6L, value=u$summary)
-  set(df, i=i, j=7L, value=u$unixReviewTime)
+  set(df_a, i=i, j=1L, value=u$reviewerID)
+  set(df_a, i=i, j=2L, value=u$asin)
+  set(df_a, i=i, j=3L, value=rn)
+  set(df_a, i=i, j=4L, value=u$reviewText)
+  set(df_a, i=i, j=5L, value=u$overall)
+  set(df_a, i=i, j=6L, value=u$summary)
+  set(df_a, i=i, j=7L, value=u$unixReviewTime)
   i = i+1L
 }
 
-head(df)
-str(df)
+dim(df_a)
+head(df_a)
+str(df_a)
+
+df_a[4,]$reviewText
 ```
 
 
 
 
-# Create tidy format.
+## Create tidy format
+
 ```{r}
-text_df <- df %>% 
+text_df_a <- df_a %>% 
   unnest_tokens(word, reviewText)
+
+# Number of words
+dim(text_df_a)
+
+# Number of unique words
+text_df_a %>%
+  select(word) %>%
+  distinct(word) %>%
+  summarize(total = n())
 ```
 
 
-# Uni-gram frequency analysis
+## Uni-gram frequency analysis
 
 ```{r}
-text_df %>%
+
+iwidth = 7
+iheight = 7
+
+theme_set(theme_gray(base_size = 18))
+
+text_df_a %>%
   anti_join(stop_words, by=c("word"="word")) %>%
-  count(word, sort=TRUE)
-```
+  count(word, sort=TRUE) %>%
+  top_n(20) %>%
+  ggplot(aes(reorder(word, n), n)) +
+  geom_col() +
+  labs(x = NULL, y = "n") +
+  coord_flip()
 
-# N-Gram analysis
+
+ggsave(file="amazon_food_1.pdf", width=iwidth, height=iheight)
+```
 
 ```{r}
 
-text_bigrams <- df %>%
+# Get the counts for the words; only save top 2000 because otherwise ggplot2 has some scalability
+# issues
+tmp = text_df_a %>%
+  anti_join(stop_words, by=c("word"="word")) %>%
+  count(word, sort=TRUE) %>%
+  head(2000)
+
+head(tmp)
+
+tmp %>%
+  filter(word=="celiac")
+
+# Select some labels (words) to display on the x-axis, so it doesn't get too crowded
+idx = seq(1, length(tmp$word), length.out=19)
+labels = tmp$word[idx]
+
+labels[length(labels)] = "" # Last label gets cut off; just set it to blank
+labels
+
+# Also, show some counts on top of the bars, just for fun
+dfLab = data.table(x=tmp$word[idx], y=tmp$n[idx], lab=as.character(tmp$n[idx]), stringsAsFactors = FALSE)
+str(dfLab)
+dfLab = dfLab[3:nrow(dfLab)-1,] # First and last number don't need to be shown (they get cut off)
+
+iwidth = 9
+iheight = 5
+
+theme_set(theme_gray(base_size = 18))
+
+
+tmp  %>%
+  ggplot(aes(reorder(word, -n), n)) +
+  geom_freqpoly() 
+
++
+  scale_x_discrete(breaks=labels, labels=labels)) +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1), axis.ticks = element_blank()) + 
+  labs(x = "word (ordered)", y = "count") + 
+  geom_text(data=dfLab, aes(x=x, y=y, label=lab), vjust=-1)
+
+
+
+tmp  %>%
+  ggplot(aes(reorder(word, -n), n)) +
+  geom_col() +
+  scale_x_discrete(breaks=labels, labels=labels)) +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1), axis.ticks = element_blank()) + 
+  labs(x = "word (ordered)", y = "count") + 
+  geom_text(data=dfLab, aes(x=x, y=y, label=lab), vjust=-1)
+
+ggsave(file="amazon_food_hist.pdf", width=iwidth, height=iheight)
+```
+
+## N-Gram analysis
+
+```{r}
+
+text_bigrams_a <- df_a %>%
   unnest_tokens(bigram, reviewText, token = "ngrams", n = 3)
 
-text_bigrams %>%
+text_bigrams_a %>%
   filter(grepl("good$", bigram)) %>%
   count(bigram, sort=TRUE)
 
-text_bigrams %>%
+text_bigrams_a %>%
   filter(grepl("bad$", bigram)) %>%
   count(bigram, sort=TRUE)
 
-text_bigrams %>%
+text_bigrams_a %>%
+  count(bigram, sort=TRUE)
+```
+
+
+
+# Reuters
+
+
+## Read in the data
+
+```{r}
+df_r = read_csv("reutersCSV.csv")
+
+head(df_r)
+str(df_r)
+
+# Not the huge list of dummy variables. Don't really want to collapse them down, because 
+# each row may be marked by 0, 1, or more topics.
+
+df_r[3,]$doc.text
+```
+
+## Conver to tidy format
+
+```{r}
+
+text_df_r <- df_r %>% 
+  unnest_tokens(word, doc.text)
+
+# Number of words
+dim(text_df_r)
+
+# Number of unique words
+text_df_r %>%
+  select(word) %>%
+  distinct(word) %>%
+  summarize(total = n())
+```
+
+
+## Uni-gram frequency analysis
+
+
+All words.
+```{r}
+
+iwidth = 7
+iheight = 7
+
+theme_set(theme_gray(base_size = 18))
+
+text_df_r %>%
+  anti_join(stop_words, by=c("word"="word")) %>%
+  count(word, sort=TRUE) %>%
+  top_n(20) %>%
+  ggplot(aes(reorder(word, n), n)) +
+  geom_col() +
+  labs(x = NULL, y = "n") +
+  coord_flip()
+
+
+ggsave(file="reuters_1.pdf", width=iwidth, height=iheight)
+```
+
+Words for a certain topic.
+```{r}
+
+iwidth = 7
+iheight = 7
+
+theme_set(theme_gray(base_size = 18))
+
+text_df_r %>%
+  filter(topic.coffee == 1) %>%
+  anti_join(stop_words, by=c("word"="word")) %>%
+  count(word, sort=TRUE) %>%
+  top_n(20) %>%
+  ggplot(aes(reorder(word, n), n)) +
+  geom_col() +
+  labs(x = NULL, y = "n") +
+  coord_flip()
+
+
+ggsave(file="reuters_coffee.pdf", width=iwidth, height=iheight)
+```
+
+## N-Gram analysis
+
+```{r}
+
+text_bigrams_r <- df_r %>%
+  unnest_tokens(bigram, doc.text, token = "ngrams", n = 4)
+
+text_bigrams_r %>%
+  filter(grepl("^united states", bigram)) %>%
+  count(bigram, sort=TRUE)
+
+text_bigrams_r %>%
+  filter(grepl("good$", bigram)) %>%
+  count(bigram, sort=TRUE)
+
+text_bigrams_r %>%
+  filter(grepl("bad$", bigram)) %>%
+  count(bigram, sort=TRUE)
+
+text_bigrams_r %>%
   count(bigram, sort=TRUE)
 ```
