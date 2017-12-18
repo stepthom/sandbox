@@ -1,0 +1,169 @@
+---
+title: "Data for slides"
+author: "Dr. Stephen W. Thomas, Queen's University"
+date: "2017"
+output:
+  pdf_document:
+    highlight: pygments
+    number_sections: yes
+    toc: no
+    toc_depth: '2'
+---
+
+
+
+```{r}
+library(tidytext)
+library(tidyr)
+library(dplyr)
+library(ggplot2)
+library(readr)
+library(tm)
+library(jsonlite)
+library(rjson)
+library(data.table)
+```
+
+# Reuters
+
+
+## Read in the data
+
+```{r}
+df_r = read_csv("data/reutersCSV.csv")
+
+head(df_r)
+str(df_r)
+
+# Not the huge list of dummy variables. Don't really want to collapse them down, because 
+# each row may be marked by 0, 1, or more topics.
+
+df_r[3,]$doc.text
+```
+
+## Conver to tidy format
+
+```{r}
+
+text_df_r <- df_r %>% 
+  unnest_tokens(word, doc.text)
+
+# Number of words
+dim(text_df_r)
+
+# Number of unique words
+text_df_r %>%
+  select(word) %>%
+  distinct(word) %>%
+  summarize(total = n())
+```
+
+
+## Uni-gram frequency analysis
+
+
+All words.
+```{r}
+
+iwidth = 7
+iheight = 7
+
+theme_set(theme_gray(base_size = 18))
+
+text_df_r %>%
+  anti_join(stop_words, by=c("word"="word")) %>%
+  count(word, sort=TRUE) %>%
+  top_n(20) %>%
+  ggplot(aes(reorder(word, n), n)) +
+  geom_col() +
+  labs(x = NULL, y = "n") +
+  coord_flip()
+
+
+ggsave(file="reuters_1.pdf", width=iwidth, height=iheight)
+```
+
+## Word frequency density plot
+
+```{r}
+tmp = text_df_r %>%
+  count(word, sort=TRUE)
+
+head(tmp)
+dim(tmp)
+
+iwidth = 9
+iheight = 5
+
+theme_set(theme_gray(base_size = 18))
+
+tmp %>%
+  filter(n > 1) %>%
+  ggplot(aes(reorder(word, -n), n)) +
+  geom_col() + 
+  theme(axis.text.x = element_blank(), axis.ticks = element_blank()) + 
+  labs (x = "rank", y = "count") +
+  scale_y_log10()
+
+ggsave(file="reuters_hist.pdf", width=iwidth, height=iheight)
+```
+
+
+## Word frequency for a certain target (i.e., retuers topic).
+```{r}
+
+iwidth = 7
+iheight = 7
+
+theme_set(theme_gray(base_size = 18))
+
+text_df_r %>%
+  filter(topic.coffee == 1) %>%
+  anti_join(stop_words, by=c("word"="word")) %>%
+  count(word, sort=TRUE) %>%
+  top_n(20) %>%
+  ggplot(aes(reorder(word, n), n)) +
+  geom_col() +
+  labs(x = NULL, y = "n") +
+  coord_flip()
+
+
+ggsave(file="reuters_coffee.pdf", width=iwidth, height=iheight)
+
+
+text_df_r %>%
+  filter(topic.housing == 1) %>%
+  anti_join(stop_words, by=c("word"="word")) %>%
+  count(word, sort=TRUE) %>%
+  top_n(20) %>%
+  ggplot(aes(reorder(word, n), n)) +
+  geom_col() +
+  labs(x = NULL, y = "n") +
+  coord_flip()
+
+
+ggsave(file="reuters_housing.pdf", width=iwidth, height=iheight)
+```
+
+## N-Gram analysis
+
+```{r}
+
+text_bigrams_r <- df_r %>%
+  unnest_tokens(bigram, doc.text, token = "ngrams", n = 4)
+
+text_bigrams_r %>%
+  filter(grepl("^united states", bigram)) %>%
+  count(bigram, sort=TRUE)
+
+text_bigrams_r %>%
+  filter(grepl("good$", bigram)) %>%
+  count(bigram, sort=TRUE)
+
+text_bigrams_r %>%
+  filter(grepl("bad$", bigram)) %>%
+  count(bigram, sort=TRUE)
+
+text_bigrams_r %>%
+  count(bigram, sort=TRUE)
+```

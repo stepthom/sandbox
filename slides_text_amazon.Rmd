@@ -51,7 +51,7 @@ topic modeling
 ```{r}
 
 # The file is, for some reason, in a strange format, where each line is its own JSON.
-dat_full <- lapply(readLines('reviews_Grocery_and_Gourmet_Food_5_50000.json'), fromJSON)
+dat_full <- lapply(readLines('data/reviews_Grocery_and_Gourmet_Food_5_50000.json'), fromJSON)
 
 # The following calls fail with parse errors, due to the above
 #dat = read_json('reviews_Grocery_and_Gourmet_Food_5.json', simplifyVector = TRUE)
@@ -119,6 +119,10 @@ df_a[4,]$reviewText
 
 df_a %>%
   filter(reviewID==24327)
+
+# Be kind to memory, and remove unneeded stuff!
+rm(dat)
+rm(dat_full)
 ```
 
 
@@ -150,14 +154,13 @@ iheight = 7
 
 theme_set(theme_gray(base_size = 18))
 
-text_df_a %>%
+unigram_counts = text_df_a %>%
   anti_join(stop_words, by=c("word"="word")) %>%
-  count(word, sort=TRUE) %>%
-  top_n(100)
+  count(word, sort=TRUE)
 
-text_df_a %>%
-  anti_join(stop_words, by=c("word"="word")) %>%
-  count(word, sort=TRUE) %>%
+head(unigram_counts, n=100)
+
+unigram_counts %>%
   top_n(20) %>%
   ggplot(aes(reorder(word, n), n)) +
   geom_col() +
@@ -165,7 +168,7 @@ text_df_a %>%
   coord_flip()
 
 
-ggsave(file="amazon_food_1.pdf", width=iwidth, height=iheight)
+ggsave(file="out/amazon_food_1.pdf", width=iwidth, height=iheight)
 ```
 
 ## Uni-gram frequency analysis, over time
@@ -194,14 +197,13 @@ text_df_a %>%
   expand_limits(x=8) +
   geom_dl(aes(label = word), method = list(dl.trans(x = x + .2), "last.points")) 
 
-ggsave(file="amazon_food_time.pdf", width=iwidth, height=iheight)
+ggsave(file="out/amazon_food_time.pdf", width=iwidth, height=iheight)
 ```
 
 
 ## Word frequency density plot
 
 ```{r}
-
 tmp = text_df_a %>%
   count(word, sort=TRUE)
 
@@ -222,7 +224,9 @@ tmp %>%
   labs (x = "rank", y = "count") +
   scale_y_log10()
 
-ggsave(file="amazon_food_hist.pdf", width=iwidth, height=iheight)
+ggsave(file="out/amazon_food_hist.pdf", width=iwidth, height=iheight)
+
+rm(tmp)
 ```
 
 
@@ -235,7 +239,7 @@ iheight = 7
 theme_set(theme_gray(base_size = 18))
 
 text_df_a %>%
-  filter(overall >= 3) %>%
+  filter(overall >= 5) %>%
   anti_join(stop_words, by=c("word"="word")) %>%
   count(word, sort=TRUE) %>%
   top_n(20) %>%
@@ -245,10 +249,14 @@ text_df_a %>%
   coord_flip()
 
 
-ggsave(file="amazon_good.pdf", width=iwidth, height=iheight)
+ggsave(file="out/amazon_good.pdf", width=iwidth, height=iheight)
+```
+
+
+```{r}
 
 text_df_a %>%
-  filter(overall < 3) %>%
+  filter(overall <= 1) %>%
   anti_join(stop_words, by=c("word"="word")) %>%
   count(word, sort=TRUE) %>%
   top_n(20) %>%
@@ -258,17 +266,15 @@ text_df_a %>%
   coord_flip()
 
 
-ggsave(file="amazon_bad.pdf", width=iwidth, height=iheight)
+ggsave(file="out/amazon_bad.pdf", width=iwidth, height=iheight)
 ```
 
 
 ## Log ratios
 
 ```{r}
-
 tmp = text_df_a %>%
-  mutate(overall_str = ifelse(overall >= 3, "positive", "negative"))
-
+  mutate(overall_str = ifelse(overall >= 4, "positive", "negative"))
 
 status_words_count = tmp %>% group_by(overall_str, word) %>%
   summarize(count=n()) %>%
@@ -283,18 +289,23 @@ log_ratios = status_words_count %>%
   mutate(total=negative+positive) %>%
   mutate(log_ratio = log2((positive+1)/(negative+1))) 
 
-log_ratios
-
 log_ratios %>%
   filter(total > 50) %>%
-  group_by(log_ratio < 0) %>%
+  filter(log_ratio > 0) %>%
+  arrange(desc(log_ratio)) %>%
+  top_n(15, abs(log_ratio))
+  
+log_ratios %>%
+  filter(total > 50) %>%
+  filter(log_ratio < 0.5) %>%
+  arrange((log_ratio)) %>%
   top_n(15, abs(log_ratio))
 
 
 iwidth = 9
-iheight = 5
+iheight = 7
 
-theme_set(theme_gray(base_size = 18))
+theme_set(theme_gray(base_size = 15))
 
 log_ratios %>%
   filter(total > 100) %>%
@@ -309,7 +320,13 @@ log_ratios %>%
   scale_fill_discrete(name = "", labels = c("negative", "positive"))
 
 
-ggsave(file="amazon_food_logodds.pdf", width=iwidth, height=iheight)
+ggsave(file="out/amazon_food_logodds.pdf", width=iwidth, height=iheight)
+
+
+# Clean up memory
+rm(tmp)
+rm(status_words_count)
+rm(log_ratios)
 ```
 
 ## N-Gram analysis
@@ -333,14 +350,21 @@ text_bigrams_a %>%
   labs(x = NULL, y = "n") +
   coord_flip()
 
-ggsave(file="amazon_food_3gram.pdf", width=iwidth, height=iheight)
+ggsave(file="out/amazon_food_3gram.pdf", width=iwidth, height=iheight)
+```
 
+
+#### N-Gram analysis, filtered for specific words
+
+
+```{r}
 iwidth = 7
 iheight = 7
 
 theme_set(theme_gray(base_size = 18))
 
 text_bigrams_a %>%
+  filter(grepl("dips", bigram)) %>%
   count(bigram, sort=TRUE) %>%
   top_n(20) %>%
   ggplot(aes(reorder(bigram, n), n)) +
@@ -348,18 +372,45 @@ text_bigrams_a %>%
   labs(x = NULL, y = "n") +
   coord_flip()
 
-ggsave(file="amazon_food_3gram.pdf", width=iwidth, height=iheight)
+ggsave(file="out/amazon_food_3gram_dips.pdf", width=iwidth, height=iheight)
+```
+
+```{r}
+iwidth = 7
+iheight = 7
+
+theme_set(theme_gray(base_size = 18))
 
 text_bigrams_a %>%
-  filter(grepl("good$", bigram)) %>%
-  count(bigram, sort=TRUE)
+  filter(grepl("viva", bigram)) %>%
+  count(bigram, sort=TRUE) %>%
+  filter(n > 3) %>%
+  top_n(20) %>%
+  ggplot(aes(reorder(bigram, n), n)) +
+  geom_col() +
+  labs(x = NULL, y = "n") +
+  coord_flip()
+
+ggsave(file="out/amazon_food_3gram_viva.pdf", width=iwidth, height=iheight)
+```
+
+```{r}
+iwidth = 7
+iheight = 7
+
+theme_set(theme_gray(base_size = 18))
 
 text_bigrams_a %>%
-  filter(grepl("bad$", bigram)) %>%
-  count(bigram, sort=TRUE)
+  filter(grepl("hopes", bigram)) %>%
+  count(bigram, sort=TRUE) %>%
+  filter(n > 4) %>%
+  top_n(20) %>%
+  ggplot(aes(reorder(bigram, n), n)) +
+  geom_col() +
+  labs(x = NULL, y = "n") +
+  coord_flip()
 
-text_bigrams_a %>%
-  count(bigram, sort=TRUE)
+ggsave(file="out/amazon_food_3gram_hopes.pdf", width=iwidth, height=iheight)
 ```
 
 ## Skip-gram analysis
@@ -374,146 +425,25 @@ library(quanteda)
 
 ```
 
-# Reuters
 
 
-## Read in the data
-
-```{r}
-df_r = read_csv("reutersCSV.csv")
-
-head(df_r)
-str(df_r)
-
-# Not the huge list of dummy variables. Don't really want to collapse them down, because 
-# each row may be marked by 0, 1, or more topics.
-
-df_r[3,]$doc.text
-```
-
-## Conver to tidy format
+## Word Clouds
 
 ```{r}
+#install.packages("wordcloud") # word-cloud generator 
 
-text_df_r <- df_r %>% 
-  unnest_tokens(word, doc.text)
-
-# Number of words
-dim(text_df_r)
-
-# Number of unique words
-text_df_r %>%
-  select(word) %>%
-  distinct(word) %>%
-  summarize(total = n())
-```
+library("tm")
+library("SnowballC")
+library("wordcloud")
+library("RColorBrewer")
 
 
-## Uni-gram frequency analysis
+set.seed(1234)
+wordcloud(words = unigram_counts$word, freq = unigram_counts$n, min.freq = 1,
+          max.words=200, random.order=FALSE, rot.per=0.35, 
+          colors=brewer.pal(8, "Dark2"))
 
 
-All words.
-```{r}
+# If you want a copy of the plot on disk, you need to manually save the image in RStudio
 
-iwidth = 7
-iheight = 7
-
-theme_set(theme_gray(base_size = 18))
-
-text_df_r %>%
-  anti_join(stop_words, by=c("word"="word")) %>%
-  count(word, sort=TRUE) %>%
-  top_n(20) %>%
-  ggplot(aes(reorder(word, n), n)) +
-  geom_col() +
-  labs(x = NULL, y = "n") +
-  coord_flip()
-
-
-ggsave(file="reuters_1.pdf", width=iwidth, height=iheight)
-```
-
-## Word frequency density plot
-
-```{r}
-tmp = text_df_r %>%
-  count(word, sort=TRUE)
-
-head(tmp)
-dim(tmp)
-
-iwidth = 9
-iheight = 5
-
-theme_set(theme_gray(base_size = 18))
-
-tmp %>%
-  filter(n > 1) %>%
-  ggplot(aes(reorder(word, -n), n)) +
-  geom_col() + 
-  theme(axis.text.x = element_blank(), axis.ticks = element_blank()) + 
-  labs (x = "rank", y = "count") +
-  scale_y_log10()
-
-ggsave(file="reuters_hist.pdf", width=iwidth, height=iheight)
-```
-
-
-## Word frequency for a certain target (i.e., retuers topic).
-```{r}
-
-iwidth = 7
-iheight = 7
-
-theme_set(theme_gray(base_size = 18))
-
-text_df_r %>%
-  filter(topic.coffee == 1) %>%
-  anti_join(stop_words, by=c("word"="word")) %>%
-  count(word, sort=TRUE) %>%
-  top_n(20) %>%
-  ggplot(aes(reorder(word, n), n)) +
-  geom_col() +
-  labs(x = NULL, y = "n") +
-  coord_flip()
-
-
-ggsave(file="reuters_coffee.pdf", width=iwidth, height=iheight)
-
-
-text_df_r %>%
-  filter(topic.housing == 1) %>%
-  anti_join(stop_words, by=c("word"="word")) %>%
-  count(word, sort=TRUE) %>%
-  top_n(20) %>%
-  ggplot(aes(reorder(word, n), n)) +
-  geom_col() +
-  labs(x = NULL, y = "n") +
-  coord_flip()
-
-
-ggsave(file="reuters_housing.pdf", width=iwidth, height=iheight)
-```
-
-## N-Gram analysis
-
-```{r}
-
-text_bigrams_r <- df_r %>%
-  unnest_tokens(bigram, doc.text, token = "ngrams", n = 4)
-
-text_bigrams_r %>%
-  filter(grepl("^united states", bigram)) %>%
-  count(bigram, sort=TRUE)
-
-text_bigrams_r %>%
-  filter(grepl("good$", bigram)) %>%
-  count(bigram, sort=TRUE)
-
-text_bigrams_r %>%
-  filter(grepl("bad$", bigram)) %>%
-  count(bigram, sort=TRUE)
-
-text_bigrams_r %>%
-  count(bigram, sort=TRUE)
 ```
