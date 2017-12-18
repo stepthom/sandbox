@@ -26,6 +26,26 @@ library(data.table)
 
 # Amazon Reviews
 
+
+introduce dataset:
+- titles, dates, etc.
+
+Throughout: show examples of text trickery.
+
+words
+words over time
+log ratios
+n-grams
+skip grams
+
+word clusters
+
+doc clusters
+
+doc classification
+
+topic modeling
+
 ## Read in the data
 
 ```{r}
@@ -133,6 +153,11 @@ theme_set(theme_gray(base_size = 18))
 text_df_a %>%
   anti_join(stop_words, by=c("word"="word")) %>%
   count(word, sort=TRUE) %>%
+  top_n(100)
+
+text_df_a %>%
+  anti_join(stop_words, by=c("word"="word")) %>%
+  count(word, sort=TRUE) %>%
   top_n(20) %>%
   ggplot(aes(reorder(word, n), n)) +
   geom_col() +
@@ -141,6 +166,35 @@ text_df_a %>%
 
 
 ggsave(file="amazon_food_1.pdf", width=iwidth, height=iheight)
+```
+
+## Uni-gram frequency analysis, over time
+
+```{r}
+#install.packages("directlabels")
+library(directlabels)
+
+iwidth = 9
+iheight = 5
+
+theme_set(theme_gray(base_size = 18))
+
+text_df_a %>%
+  anti_join(stop_words, by=c("word"="word")) %>%
+  filter(word %in% c("coffee", "tea", "chocolate", "milk", "cheese", "pasta")) %>%
+  mutate(dt = as.POSIXct(unixReviewTime, origin="1970-01-01")) %>%
+  mutate(month = format(dt, "%m"), year = format(dt, "%Y")) %>%
+  filter(year > 2006) %>%
+  filter(year < 2014) %>%
+  count(word, year, sort=TRUE) %>%
+  ggplot(aes(year, n, group=word, color=word)) +
+  geom_line(aes(color=word)) +
+  labs(x = "year", y = "n") + 
+  scale_colour_discrete(guide = 'none')  +    
+  expand_limits(x=8) +
+  geom_dl(aes(label = word), method = list(dl.trans(x = x + .2), "last.points")) 
+
+ggsave(file="amazon_food_time.pdf", width=iwidth, height=iheight)
 ```
 
 
@@ -308,7 +362,17 @@ text_bigrams_a %>%
   count(bigram, sort=TRUE)
 ```
 
+## Skip-gram analysis
 
+```{r}
+install.packages("quanteda")
+library(quanteda)
+
+# TODO:
+# Upgrade to OSX 10.11
+# Upgrade to R 3.4.3
+
+```
 
 # Reuters
 
