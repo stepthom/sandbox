@@ -30,21 +30,9 @@ library(data.table)
 introduce dataset:
 - titles, dates, etc.
 
-Throughout: show examples of text trickery.
+TODO: Throughout: show examples of text trickery.
 
-words
-words over time
-log ratios
-n-grams
-skip grams
 
-word clusters
-
-doc clusters
-
-doc classification
-
-topic modeling
 
 ## Read in the data
 
@@ -115,7 +103,7 @@ dim(df_a)
 head(df_a)
 str(df_a)
 
-df_a[4,]$reviewText
+df_a[4,]
 
 df_a %>%
   filter(reviewID==24327)
@@ -419,8 +407,10 @@ ggsave(file="out/amazon_food_3gram_hopes.pdf", width=iwidth, height=iheight)
 install.packages("quanteda")
 library(quanteda)
 
+install.packages("textTinyR")
+
 # TODO:
-# Upgrade to OSX 10.11
+# Upgrade to OSX 10.11 +
 # Upgrade to R 3.4.3
 
 ```
@@ -447,3 +437,40 @@ wordcloud(words = unigram_counts$word, freq = unigram_counts$n, min.freq = 1,
 # If you want a copy of the plot on disk, you need to manually save the image in RStudio
 
 ```
+
+
+# Word Clusters
+
+```{r}
+
+
+```
+
+
+# Document Clusters
+
+
+```{r}
+
+
+```
+
+
+
+# Topic Models
+
+```{r}
+
+
+```
+
+
+# Document Classification
+
+
+```{r}
+
+
+```
+
+
