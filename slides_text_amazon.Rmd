@@ -22,6 +22,11 @@ library(tm)
 library(jsonlite)
 library(rjson)
 library(data.table)
+library(directlabels)
+library(textTinyR)
+library(wordcloud)
+library(SnowballC)
+library(RColorBrewer)
 ```
 
 # Amazon Reviews
@@ -162,8 +167,6 @@ ggsave(file="out/amazon_food_1.pdf", width=iwidth, height=iheight)
 ## Uni-gram frequency analysis, over time
 
 ```{r}
-#install.packages("directlabels")
-library(directlabels)
 
 iwidth = 9
 iheight = 5
@@ -404,8 +407,8 @@ ggsave(file="out/amazon_food_3gram_hopes.pdf", width=iwidth, height=iheight)
 ## Skip-gram analysis
 
 ```{r}
-install.packages("quanteda")
-library(quanteda)
+#install.packages("quanteda")
+#library(quanteda)
 
 install.packages("textTinyR")
 
@@ -420,14 +423,6 @@ install.packages("textTinyR")
 ## Word Clouds
 
 ```{r}
-#install.packages("wordcloud") # word-cloud generator 
-
-library("tm")
-library("SnowballC")
-library("wordcloud")
-library("RColorBrewer")
-
-
 set.seed(1234)
 wordcloud(words = unigram_counts$word, freq = unigram_counts$n, min.freq = 1,
           max.words=200, random.order=FALSE, rot.per=0.35, 
