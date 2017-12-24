@@ -1,5 +1,5 @@
 ---
-title: "Data for slides"
+title: "Data for slides - Amazon Reviews"
 author: "Dr. Stephen W. Thomas, Queen's University"
 date: "2017"
 output:
@@ -23,7 +23,6 @@ library(jsonlite)
 library(rjson)
 library(data.table)
 library(directlabels)
-library(textTinyR)
 library(wordcloud)
 library(SnowballC)
 library(RColorBrewer)
@@ -73,7 +72,7 @@ if (sample == TRUE) {
 # The following code is an ugly hack. Unfortunately, simple methods like as.data.frame were not working,
 # and in the interest of time, I just brute forced the creation of a dataframe by looping through
 # the list of json docs manually.
-df_a = data.table(
+df = data.table(
   reviewID = rep(1L, n),
   reviewerID = rep("", n),
   asin = rep("", n),
@@ -93,24 +92,24 @@ for (u in dat) {
   } else {
     rn = u$reviewerName
   }
-  set(df_a, i=i, j=1L, value=i)
-  set(df_a, i=i, j=2L, value=u$reviewerID)
-  set(df_a, i=i, j=3L, value=u$asin)
-  set(df_a, i=i, j=4L, value=rn)
-  set(df_a, i=i, j=5L, value=u$reviewText)
-  set(df_a, i=i, j=6L, value=u$overall)
-  set(df_a, i=i, j=7L, value=u$summary)
-  set(df_a, i=i, j=8L, value=u$unixReviewTime)
+  set(df, i=i, j=1L, value=i)
+  set(df, i=i, j=2L, value=u$reviewerID)
+  set(df, i=i, j=3L, value=u$asin)
+  set(df, i=i, j=4L, value=rn)
+  set(df, i=i, j=5L, value=u$reviewText)
+  set(df, i=i, j=6L, value=u$overall)
+  set(df, i=i, j=7L, value=u$summary)
+  set(df, i=i, j=8L, value=u$unixReviewTime)
   i = i+1L
 }
 
-dim(df_a)
-head(df_a)
-str(df_a)
+dim(df)
+head(df)
+str(df)
 
-df_a[4,]
+df[4,]$reviewText
 
-df_a %>%
+df %>%
   filter(reviewID==24327)
 
 # Be kind to memory, and remove unneeded stuff!
@@ -121,24 +120,24 @@ rm(dat_full)
 
 
 
-## Create tidy format
+# Create tidy format
 
 ```{r}
-text_df_a <- df_a %>% 
+tidy <- df %>% 
   unnest_tokens(word, reviewText)
 
 # Number of words
-dim(text_df_a)
+dim(tidy)
 
 # Number of unique words
-text_df_a %>%
+tidy %>%
   select(word) %>%
   distinct(word) %>%
   summarize(total = n())
 ```
 
 
-## Uni-gram frequency analysis
+# Uni-gram frequency analysis
 
 ```{r}
 
@@ -147,7 +146,7 @@ iheight = 7
 
 theme_set(theme_gray(base_size = 18))
 
-unigram_counts = text_df_a %>%
+unigram_counts = tidy %>%
   anti_join(stop_words, by=c("word"="word")) %>%
   count(word, sort=TRUE)
 
@@ -164,7 +163,7 @@ unigram_counts %>%
 ggsave(file="out/amazon_food_1.pdf", width=iwidth, height=iheight)
 ```
 
-## Uni-gram frequency analysis, over time
+# Uni-gram frequency analysis, over time
 
 ```{r}
 
@@ -173,7 +172,7 @@ iheight = 5
 
 theme_set(theme_gray(base_size = 18))
 
-text_df_a %>%
+tidy %>%
   anti_join(stop_words, by=c("word"="word")) %>%
   filter(word %in% c("coffee", "tea", "chocolate", "milk", "cheese", "pasta")) %>%
   mutate(dt = as.POSIXct(unixReviewTime, origin="1970-01-01")) %>%
@@ -192,10 +191,10 @@ ggsave(file="out/amazon_food_time.pdf", width=iwidth, height=iheight)
 ```
 
 
-## Word frequency density plot
+# Word frequency density plot
 
 ```{r}
-tmp = text_df_a %>%
+tmp = tidy %>%
   count(word, sort=TRUE)
 
 head(tmp)
@@ -221,7 +220,7 @@ rm(tmp)
 ```
 
 
-## Word frequency for a certain target (i.e., rating).
+# Word frequency for a certain target (i.e., rating).
 ```{r}
 
 iwidth = 7
@@ -229,7 +228,7 @@ iheight = 7
 
 theme_set(theme_gray(base_size = 18))
 
-text_df_a %>%
+tidy %>%
   filter(overall >= 5) %>%
   anti_join(stop_words, by=c("word"="word")) %>%
   count(word, sort=TRUE) %>%
@@ -246,7 +245,7 @@ ggsave(file="out/amazon_good.pdf", width=iwidth, height=iheight)
 
 ```{r}
 
-text_df_a %>%
+tidy %>%
   filter(overall <= 1) %>%
   anti_join(stop_words, by=c("word"="word")) %>%
   count(word, sort=TRUE) %>%
@@ -261,10 +260,10 @@ ggsave(file="out/amazon_bad.pdf", width=iwidth, height=iheight)
 ```
 
 
-## Log ratios
+# Log ratios
 
 ```{r}
-tmp = text_df_a %>%
+tmp = tidy %>%
   mutate(overall_str = ifelse(overall >= 4, "positive", "negative"))
 
 status_words_count = tmp %>% group_by(overall_str, word) %>%
@@ -320,11 +319,11 @@ rm(status_words_count)
 rm(log_ratios)
 ```
 
-## N-Gram analysis
+# N-Gram analysis
 
 ```{r}
 
-text_bigrams_a <- df_a %>%
+text_bigrams <- df %>%
   unnest_tokens(bigram, reviewText, token = "ngrams", n = 3)
 
 
@@ -333,7 +332,7 @@ iheight = 7
 
 theme_set(theme_gray(base_size = 18))
 
-text_bigrams_a %>%
+text_bigrams %>%
   count(bigram, sort=TRUE) %>%
   top_n(20) %>%
   ggplot(aes(reorder(bigram, n), n)) +
@@ -345,7 +344,7 @@ ggsave(file="out/amazon_food_3gram.pdf", width=iwidth, height=iheight)
 ```
 
 
-#### N-Gram analysis, filtered for specific words
+## N-Gram analysis, filtered for specific words
 
 
 ```{r}
@@ -354,7 +353,7 @@ iheight = 7
 
 theme_set(theme_gray(base_size = 18))
 
-text_bigrams_a %>%
+text_bigrams %>%
   filter(grepl("dips", bigram)) %>%
   count(bigram, sort=TRUE) %>%
   top_n(20) %>%
@@ -372,7 +371,7 @@ iheight = 7
 
 theme_set(theme_gray(base_size = 18))
 
-text_bigrams_a %>%
+text_bigrams %>%
   filter(grepl("viva", bigram)) %>%
   count(bigram, sort=TRUE) %>%
   filter(n > 3) %>%
@@ -391,7 +390,7 @@ iheight = 7
 
 theme_set(theme_gray(base_size = 18))
 
-text_bigrams_a %>%
+text_bigrams %>%
   filter(grepl("hopes", bigram)) %>%
   count(bigram, sort=TRUE) %>%
   filter(n > 4) %>%
@@ -404,23 +403,27 @@ text_bigrams_a %>%
 ggsave(file="out/amazon_food_3gram_hopes.pdf", width=iwidth, height=iheight)
 ```
 
-## Skip-gram analysis
+# Skip-gram analysis
 
 ```{r}
+# Nevermind. Getting packages installed is taking too long.
+
 #install.packages("quanteda")
 #library(quanteda)
-
-install.packages("textTinyR")
 
 # TODO:
 # Upgrade to OSX 10.11 +
 # Upgrade to R 3.4.3
 
+#install.packages("textTinyR")
+
+
+
 ```
 
 
 
-## Word Clouds
+# Word Clouds
 
 ```{r}
 set.seed(1234)

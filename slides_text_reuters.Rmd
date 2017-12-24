@@ -22,6 +22,10 @@ library(tm)
 library(jsonlite)
 library(rjson)
 library(data.table)
+library(directlabels)
+library(wordcloud)
+library(SnowballC)
+library(RColorBrewer)
 ```
 
 # Reuters
@@ -30,39 +34,52 @@ library(data.table)
 ## Read in the data
 
 ```{r}
-df_r = read_csv("data/reutersCSV.csv")
+df = read_csv("data/reutersCSV.csv")
 
-head(df_r)
-str(df_r)
+head(df)
+str(df)
 
 # Not the huge list of dummy variables. Don't really want to collapse them down, because 
 # each row may be marked by 0, 1, or more topics.
 
-df_r[3,]$doc.text
+colnames(df)[which(df[1,]==1)]
+colnames(df)[which(df[2,]==1)]
+colnames(df)[which(df[5,]==1)]
+colnames(df)[which(df[9,]==1)]
+
+df[1,]$doc.title
+df[1,]$doc.text
+
+df[2,]$doc.title
+df[2,]$doc.text
+
+df[5,]$doc.title
+df[5,]$doc.text
+
+df[9,]$doc.title
+df[9,]$doc.text
 ```
 
-## Conver to tidy format
+
+# Create tidy format
 
 ```{r}
-
-text_df_r <- df_r %>% 
+tidy <- df %>% 
   unnest_tokens(word, doc.text)
 
 # Number of words
-dim(text_df_r)
+dim(tidy)
 
 # Number of unique words
-text_df_r %>%
+tidy %>%
   select(word) %>%
   distinct(word) %>%
   summarize(total = n())
 ```
 
 
-## Uni-gram frequency analysis
+# Uni-gram frequency analysis
 
-
-All words.
 ```{r}
 
 iwidth = 7
@@ -70,9 +87,13 @@ iheight = 7
 
 theme_set(theme_gray(base_size = 18))
 
-text_df_r %>%
+unigram_counts = tidy %>%
   anti_join(stop_words, by=c("word"="word")) %>%
-  count(word, sort=TRUE) %>%
+  count(word, sort=TRUE)
+
+head(unigram_counts, n=100)
+
+unigram_counts %>%
   top_n(20) %>%
   ggplot(aes(reorder(word, n), n)) +
   geom_col() +
@@ -80,17 +101,27 @@ text_df_r %>%
   coord_flip()
 
 
-ggsave(file="reuters_1.pdf", width=iwidth, height=iheight)
+ggsave(file="out/reuters_1.pdf", width=iwidth, height=iheight)
 ```
 
-## Word frequency density plot
+# Uni-gram frequency analysis, over time
 
 ```{r}
-tmp = text_df_r %>%
+
+# Unfortunately, there's no time variable.
+
+```
+
+
+# Word frequency density plot
+
+```{r}
+tmp = tidy %>%
   count(word, sort=TRUE)
 
 head(tmp)
 dim(tmp)
+
 
 iwidth = 9
 iheight = 5
@@ -105,11 +136,13 @@ tmp %>%
   labs (x = "rank", y = "count") +
   scale_y_log10()
 
-ggsave(file="reuters_hist.pdf", width=iwidth, height=iheight)
+ggsave(file="out/reuters_hist.pdf", width=iwidth, height=iheight)
+
+rm(tmp)
 ```
 
 
-## Word frequency for a certain target (i.e., retuers topic).
+# Word frequency for a certain target (i.e., rating).
 ```{r}
 
 iwidth = 7
@@ -117,21 +150,7 @@ iheight = 7
 
 theme_set(theme_gray(base_size = 18))
 
-text_df_r %>%
-  filter(topic.coffee == 1) %>%
-  anti_join(stop_words, by=c("word"="word")) %>%
-  count(word, sort=TRUE) %>%
-  top_n(20) %>%
-  ggplot(aes(reorder(word, n), n)) +
-  geom_col() +
-  labs(x = NULL, y = "n") +
-  coord_flip()
-
-
-ggsave(file="reuters_coffee.pdf", width=iwidth, height=iheight)
-
-
-text_df_r %>%
+tidy %>%
   filter(topic.housing == 1) %>%
   anti_join(stop_words, by=c("word"="word")) %>%
   count(word, sort=TRUE) %>%
@@ -142,28 +161,240 @@ text_df_r %>%
   coord_flip()
 
 
-ggsave(file="reuters_housing.pdf", width=iwidth, height=iheight)
+ggsave(file="out/reuters_housing.pdf", width=iwidth, height=iheight)
 ```
 
-## N-Gram analysis
 
 ```{r}
 
-text_bigrams_r <- df_r %>%
-  unnest_tokens(bigram, doc.text, token = "ngrams", n = 4)
+iwidth = 7
+iheight = 7
 
-text_bigrams_r %>%
-  filter(grepl("^united states", bigram)) %>%
-  count(bigram, sort=TRUE)
+theme_set(theme_gray(base_size = 18))
 
-text_bigrams_r %>%
-  filter(grepl("good$", bigram)) %>%
-  count(bigram, sort=TRUE)
+tidy %>%
+  filter(topic.wheat == 1) %>%
+  anti_join(stop_words, by=c("word"="word")) %>%
+  count(word, sort=TRUE) %>%
+  top_n(20) %>%
+  ggplot(aes(reorder(word, n), n)) +
+  geom_col() +
+  labs(x = NULL, y = "n") +
+  coord_flip()
 
-text_bigrams_r %>%
-  filter(grepl("bad$", bigram)) %>%
-  count(bigram, sort=TRUE)
 
-text_bigrams_r %>%
-  count(bigram, sort=TRUE)
+ggsave(file="out/reuters_wheat.pdf", width=iwidth, height=iheight)
 ```
+
+
+
+
+# N-Gram analysis
+
+## 5-grams
+
+```{r}
+
+text_5grams <- df %>%
+  unnest_tokens(ngram, doc.text, token = "ngrams", n = 5)
+
+
+iwidth = 7
+iheight = 7
+
+theme_set(theme_gray(base_size = 18))
+
+text_5grams %>%
+  count(ngram, sort=TRUE) %>%
+  top_n(20) %>%
+  ggplot(aes(reorder(ngram, n), n)) +
+  geom_col() +
+  labs(x = NULL, y = "n") +
+  coord_flip()
+
+ggsave(file="out/reuters_5gram.pdf", width=iwidth, height=iheight)
+
+# Clean up memory
+rm(text_5grams)
+```
+
+## 4-grams
+
+```{r}
+
+text_4grams <- df %>%
+  unnest_tokens(ngram, doc.text, token = "ngrams", n = 4)
+
+
+iwidth = 7
+iheight = 7
+
+theme_set(theme_gray(base_size = 18))
+
+text_4grams %>%
+  count(ngram, sort=TRUE) %>%
+  top_n(20) %>%
+  ggplot(aes(reorder(ngram, n), n)) +
+  geom_col() +
+  labs(x = NULL, y = "n") +
+  coord_flip()
+
+ggsave(file="out/reuters_4gram.pdf", width=iwidth, height=iheight)
+
+# Clean up memory
+rm(text_4grams)
+```
+
+## 3-grams
+
+```{r}
+
+text_3grams <- df %>%
+  unnest_tokens(bigram, doc.text, token = "ngrams", n = 3)
+
+
+iwidth = 7
+iheight = 7
+
+theme_set(theme_gray(base_size = 18))
+
+text_3grams %>%
+  count(bigram, sort=TRUE) %>%
+  top_n(20) %>%
+  ggplot(aes(reorder(bigram, n), n)) +
+  geom_col() +
+  labs(x = NULL, y = "n") +
+  coord_flip()
+
+ggsave(file="out/reuters_3gram.pdf", width=iwidth, height=iheight)
+```
+
+
+## N-Gram analysis, filtered for specific words
+
+
+```{r}
+iwidth = 7
+iheight = 7
+
+theme_set(theme_gray(base_size = 18))
+
+text_bigrams %>%
+  filter(grepl("dips", bigram)) %>%
+  count(bigram, sort=TRUE) %>%
+  top_n(20) %>%
+  ggplot(aes(reorder(bigram, n), n)) +
+  geom_col() +
+  labs(x = NULL, y = "n") +
+  coord_flip()
+
+ggsave(file="out/reuters_3gram_dips.pdf", width=iwidth, height=iheight)
+```
+
+```{r}
+iwidth = 7
+iheight = 7
+
+theme_set(theme_gray(base_size = 18))
+
+text_bigrams %>%
+  filter(grepl("viva", bigram)) %>%
+  count(bigram, sort=TRUE) %>%
+  filter(n > 3) %>%
+  top_n(20) %>%
+  ggplot(aes(reorder(bigram, n), n)) +
+  geom_col() +
+  labs(x = NULL, y = "n") +
+  coord_flip()
+
+ggsave(file="out/reuters_3gram_viva.pdf", width=iwidth, height=iheight)
+```
+
+```{r}
+iwidth = 7
+iheight = 7
+
+theme_set(theme_gray(base_size = 18))
+
+text_bigrams %>%
+  filter(grepl("hopes", bigram)) %>%
+  count(bigram, sort=TRUE) %>%
+  filter(n > 4) %>%
+  top_n(20) %>%
+  ggplot(aes(reorder(bigram, n), n)) +
+  geom_col() +
+  labs(x = NULL, y = "n") +
+  coord_flip()
+
+ggsave(file="out/reuters_3gram_hopes.pdf", width=iwidth, height=iheight)
+```
+
+# Skip-gram analysis
+
+```{r}
+# Nevermind. Getting packages installed is taking too long.
+
+#install.packages("quanteda")
+#library(quanteda)
+
+# TODO:
+# Upgrade to OSX 10.11 +
+# Upgrade to R 3.4.3
+
+#install.packages("textTinyR")
+
+
+
+```
+
+
+
+# Word Clouds
+
+```{r}
+set.seed(1234)
+wordcloud(words = unigram_counts$word, freq = unigram_counts$n, min.freq = 1,
+          max.words=200, random.order=FALSE, rot.per=0.35, 
+          colors=brewer.pal(8, "Dark2"))
+
+
+# If you want a copy of the plot on disk, you need to manually save the image in RStudio
+
+```
+
+
+# Word Clusters
+
+```{r}
+
+
+```
+
+
+# Document Clusters
+
+
+```{r}
+
+
+```
+
+
+
+# Topic Models
+
+```{r}
+
+
+```
+
+
+# Document Classification
+
+
+```{r}
+
+
+```
+
+
