@@ -23,7 +23,6 @@ library(jsonlite)
 library(rjson)
 library(data.table)
 library(directlabels)
-library(textTinyR)
 library(wordcloud)
 library(SnowballC)
 library(RColorBrewer)
@@ -410,7 +409,7 @@ ggsave(file="out/amazon_food_3gram_hopes.pdf", width=iwidth, height=iheight)
 #install.packages("quanteda")
 #library(quanteda)
 
-install.packages("textTinyR")
+#install.packages("textTinyR")
 
 # TODO:
 # Upgrade to OSX 10.11 +

@@ -70,9 +70,13 @@ iheight = 7
 
 theme_set(theme_gray(base_size = 18))
 
-text_df_r %>%
+unigram_counts = text_df_r %>%
   anti_join(stop_words, by=c("word"="word")) %>%
-  count(word, sort=TRUE) %>%
+  count(word, sort=TRUE)
+
+head(unigram_counts, n=100)
+
+unigram_counts %>%
   top_n(20) %>%
   ggplot(aes(reorder(word, n), n)) +
   geom_col() +
@@ -80,7 +84,8 @@ text_df_r %>%
   coord_flip()
 
 
-ggsave(file="reuters_1.pdf", width=iwidth, height=iheight)
+ggsave(file="out/reuters_1.pdf", width=iwidth, height=iheight)
+
 ```
 
 ## Word frequency density plot
@@ -166,4 +171,17 @@ text_bigrams_r %>%
 
 text_bigrams_r %>%
   count(bigram, sort=TRUE)
+```
+
+## Word Clouds
+
+```{r}
+set.seed(1234)
+wordcloud(words = unigram_counts$word, freq = unigram_counts$n, min.freq = 1,
+          max.words=200, random.order=FALSE, rot.per=0.35, 
+          colors=brewer.pal(8, "Dark2"))
+
+
+# If you want a copy of the plot on disk, you need to manually save the image in RStudio
+
 ```
