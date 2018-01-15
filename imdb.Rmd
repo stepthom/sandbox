@@ -13,17 +13,9 @@ output:
 
 
 ```{r}
-library(tidytext)
-library(RSentiment)
-library(cleanNLP)
-library(tidyr)
-library(dplyr)
-library(ggplot2)
-library(readr)
-library(lubridate)
-library(stringr)
-library(scales)
-library(tm)
+if (!require("pacman")) install.packages("pacman")
+pacman::p_load(tidytext, tidyverse, cleanNLP, lubridate, 
+               stringr, scales, tm, rpart, rpart.plot, MLmetrics, stringi)
 ```
 
 # Read in the data
@@ -36,12 +28,34 @@ imdb <- imdb %>%
   mutate(id = 1:nrow(imdb)) %>%
   select(id, everything())
 
+dim(imdb)
+
 # For now, just take a fraction
+set.seed(123)
 imdb <- imdb %>%
-  sample_frac(0.03)
+  sample_frac(0.3)
+
+# Now, I noticed that there were some weird characters in the file. Non-ascii, weird stuff.
+# I removed some in the input file, in vim, using the command:
+# :.,$s/[\x97]/ - /g
+#
+# I did the above for (if memory serves): \u0096, \u0097, \u0084, \u008d, \u0095, and \u0091.
+#
+# For good measure, let's remove a few more, here in R, below:
+
+imdb$review = stringi::stri_trans_general(imdb$review, "latin-ascii")
+imdb$review= gsub('\\R', '', imdb$review, perl=T)
+imdb$review= gsub('£|¢|§|¦|·|¡|°|¿', ' ', imdb$review, perl=T)
+imdb$review= gsub('´', '\'', imdb$review, perl=T)
+imdb$review= gsub('¨', '"', imdb$review, perl=T)
+
+
+# BTW, here is how I searched for those non-ascii characters:
+# grep("I_WAS_NOT_ASCII", iconv(imdb$review, "latin1", "ASCII", sub="I_WAS_NOT_ASCII"))
 
 # Inspect
 head(imdb)
+imdb[4,]$review
 ```
 
 ```{r}
@@ -178,7 +192,7 @@ There's a lot of features we can have for each document:
 - Word frequencies of all words
 - Word frequencies of only the most frequent words
 - Word frequencies of only the most polarizing words
-- Any of the above, except with binary word frequencies
+- Any of the above, except with binary word frequencies or some other weighting scheme
 - Topic memberships (after running e.g., LDA)
 - Cluster memberships (after running e.g., kmeans)
 
@@ -187,20 +201,72 @@ For now, we'll go with the third approach. We'll start by creating a DTM.
 ```{r}
 
 
-# First, need to get the counts of each polarizing word in each doc
-tidy_counts = tidy %>%
-  filter(word %in% top_log_ratios$word) %>% # only keep most polarizing words
-  group_by(id, uid, sentiment, word) %>%
-  summarize(count = n())
+use_tidy = FALSE
+if (use_tidy == TRUE) {
+  # First, need to get the counts of each polarizing word in each doc
+  tidy_counts = tidy %>%
+    filter(word %in% top_log_ratios$word) %>% # only keep most polarizing words
+    group_by(id, uid, sentiment, word) %>%
+    summarize(count = n())
+  
+  # Make the DTM
+  dtm <- tidy_counts %>%
+    cast_dtm(id, word, count)
+  dim(dtm)
+  inspect(dtm)
+  
+  # Now, if we want to use some of tm's preprocessing functions, we need to first convert the DTM
+  # to a corpus object, then run the preprocessing functions, and then convert the corpus object
+  # back to a DTM. (Strange, I know.)
+  
+  # Convert DTM to a list of text
+  dtm_list <- apply(dtm, 1, function(x) {
+      paste(rep(names(x), x), collapse=" ")
+  })
+  
+  corpus <- VCorpus(VectorSource(dtm_list))
+} else {
+  sourceData <- VectorSource(imdb$review)
+  corpus <- VCorpus(sourceData)
+}
 
-# Make the DTM
-dtm <- tidy_counts %>%
-  cast_dtm(id, word, count)
+corpus[[1]]$content
+corpus[[2]]$content
+corpus[[3]]$content
+corpus[[4]]$content
 
-# Can optionally do some preprocessing using some functions in the tm package
-# dtm <- removeSparseTerms(dtm, 0.1)
-# dtm <- removeNumbers(dtm)
-# dtm <- removePunctuation(dtm)
+# Y'all got any more of those preprocessing steps?
+corpus <- tm_map(corpus, content_transformer(tolower))
+corpus <- tm_map(corpus, removeNumbers)
+corpus <- tm_map(corpus, removePunctuation)
+corpus <- tm_map(corpus, removeWords, stopwords('english'))
+corpus <- tm_map(corpus, removeWords, c("\u0085", "br"))
+corpus <- tm_map(corpus, stemDocument, language = "english") 
+corpus <- tm_map(corpus, stripWhitespace)
+
+corpus[[1]]$content
+corpus[[2]]$content
+corpus[[3]]$content
+corpus[[4]]$content
+
+BigramTokenizer  <- function(x) {
+  RWeka::NGramTokenizer(x, RWeka::Weka_control(min = 1, max = 3))
+}
+
+dtm <- DocumentTermMatrix(corpus, 
+                          control = list(tokenize = BigramTokenizer, weighting = function(x) weightTfIdf(x, normalize = FALSE)))
+
+
+dtm$dimnames$Terms
+inspect(dtm)
+
+# Only keep the top features
+dtm1 = removeSparseTerms(dtm, .994)
+dim(dtm1)
+dtm1$dimnames$Terms
+```
+
+```{r}
 
 # Convert the dtm to a dataframe, so we can pass it into some classifiers
 df <- as.data.frame(as.matrix(dtm))
@@ -220,6 +286,7 @@ rownames(labels) <- labels[,1]
 labels[,1] <- NULL
 df_l = merge(df, labels, by="row.names", all.x=TRUE)
 df_l[,1] <- NULL # Don't want the pesky "RowNames" column hanging around
+head(df_l)
 ```
 
 Split into training and testing.
