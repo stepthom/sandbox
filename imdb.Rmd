@@ -267,9 +267,8 @@ dtm1$dimnames$Terms
 ```
 
 ```{r}
-
 # Convert the dtm to a dataframe, so we can pass it into some classifiers
-df <- as.data.frame(as.matrix(dtm))
+df <- as.data.frame(as.matrix(dtm1))
 
 # Get the truth label.
 # How I do this is a bit wonky. What we have to do is append a column to our df 
