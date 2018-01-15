@@ -11,7 +11,6 @@ output:
 ---
 
 
-
 ```{r}
 library(tidytext)
 library(tidyr)
@@ -19,8 +18,6 @@ library(dplyr)
 library(ggplot2)
 library(readr)
 library(tm)
-library(jsonlite)
-library(rjson)
 library(data.table)
 library(directlabels)
 library(wordcloud)
@@ -30,77 +27,16 @@ library(RColorBrewer)
 
 # Amazon Reviews
 
-
-introduce dataset:
-- titles, dates, etc.
-
-TODO: Throughout: show examples of text trickery.
-
-
-
 ## Read in the data
 
 ```{r}
+df = read_csv("data/reviews_Grocery_and_Gourmet_Food_5_50000.csv")
 
-# The file is, for some reason, in a strange format, where each line is its own JSON.
-dat_full <- lapply(readLines('data/reviews_Grocery_and_Gourmet_Food_5_50000.json'), fromJSON)
-
-# The following calls fail with parse errors, due to the above
-#dat = read_json('reviews_Grocery_and_Gourmet_Food_5.json', simplifyVector = TRUE)
-#dat = fromJSON(file='reviews_Grocery_and_Gourmet_Food_5.json')
-```
-
-
-## Take a sample
-
-```{r}
-
-# Take a sample of the data, just for ease of use
-sample = FALSE
-if (sample == TRUE) {
-  n = 5000
-  set.seed(1111)
-  dat = sample(dat_full, n)
-} else {
-  n = length(dat_full)
-  dat = dat_full
-}
-
-
-# Create a dataframe out of the data.
-# (Actually, use a data.table for speed. Also use the set() method for great speedup.)
-# The following code is an ugly hack. Unfortunately, simple methods like as.data.frame were not working,
-# and in the interest of time, I just brute forced the creation of a dataframe by looping through
-# the list of json docs manually.
-df = data.table(
-  reviewID = rep(1L, n),
-  reviewerID = rep("", n),
-  asin = rep("", n),
-  reviewerName = rep("", n),
-  reviewText = rep("", n),
-  overall = rep(-1L, n) ,
-  summary = rep("", n),
-  unixReviewTime = rep(-1L, n),
-  stringsAsFactors = FALSE
-  )
-
-i = 1L
-for (u in dat) {
-  # Some reviews have a NULL/empty reviewer name.
-  if (!exists("reviewerName", where = u)) {
-    rn = ""
-  } else {
-    rn = u$reviewerName
-  }
-  set(df, i=i, j=1L, value=i)
-  set(df, i=i, j=2L, value=u$reviewerID)
-  set(df, i=i, j=3L, value=u$asin)
-  set(df, i=i, j=4L, value=rn)
-  set(df, i=i, j=5L, value=u$reviewText)
-  set(df, i=i, j=6L, value=u$overall)
-  set(df, i=i, j=7L, value=u$summary)
-  set(df, i=i, j=8L, value=u$unixReviewTime)
-  i = i+1L
+# Take sample?
+take_sample = TRUE
+if (take_sample) {
+  df = df %>%
+    sample_frac(size = 0.1, replace=FALSE)
 }
 
 dim(df)
@@ -111,10 +47,6 @@ df[4,]$reviewText
 
 df %>%
   filter(reviewID==24327)
-
-# Be kind to memory, and remove unneeded stuff!
-rm(dat)
-rm(dat_full)
 ```
 
 
@@ -436,6 +368,56 @@ wordcloud(words = unigram_counts$word, freq = unigram_counts$n, min.freq = 1,
 
 ```
 
+# TDM and TF-IDF
+
+Let's convert our tidy representation to tm's term document matrix representation, utilizing a TF-IDF weighting along the way.
+
+```{r}
+
+# Choose a random document to study in this section.
+t = df %>%
+  filter(reviewID==24328) %>%
+  select(reviewText)
+
+t$reviewText
+
+tidy_counts = tidy %>%
+  anti_join(stop_words, by=c("word"="word")) %>%
+  count(reviewID, word, sort=TRUE)
+
+tidy_counts %>%
+  filter(reviewID == 24328)
+
+# Cast into a tm Term Document Matrix
+dtm = tidy_counts %>%
+  cast_dtm(reviewID, word, n)
+
+str(dtm)
+inspect(dtm)
+
+# Find terms that occur at least 1000 times
+findFreqTerms(dtm, 1000)
+
+# Find words that correlate. (This is kinda slow.)
+findAssocs(dtm, "plums", 0.65)
+
+# Cast again, only this time using TFIDF weighting
+dtm_tfidf = tidy_counts %>%
+  cast_dtm(reviewID, word, n, weighting=tm::weightTfIdf)
+
+idx = which(dtm$dimnames$Docs == 24328)
+inspect(dtm[idx,])
+sort(as.data.frame(as.matrix(dtm[idx,])), decreasing=T)
+
+idx = which(dtm_tfidf$dimnames$Docs == 24328)
+inspect(dtm_tfidf[idx,])
+sort(as.data.frame(as.matrix(dtm_tfidf[idx,])), decreasing=T)
+
+rm(dtm)
+rm(dtm_tfidf)
+rm(tidy_counts)
+gc()
+```
 
 # Word Clusters
 
@@ -465,9 +447,124 @@ wordcloud(words = unigram_counts$word, freq = unigram_counts$n, min.freq = 1,
 
 # Document Classification
 
+Note: this part of the doc was moved to slides_text_amazon_classify.R.
+
+Using the tm package, let's do the entire classification process:
+- Preprocessing
+- Term weighting
+- Split data
+- Building models
 
 ```{r}
 
+set.seed(143)
+sample_df = df %>%
+  sample_n(1000)
+
+# a vector source interprets each element of the vector as a document
+sourceData <- VectorSource(sample_df$reviewText)
+
+
+
+# create the corpus
+corpus <- Corpus(sourceData)
+
+# example document before pre-processing
+corpus[[20]]$content
+
+# preprocess/clean the training corpus
+corpus <- tm_map(corpus, content_transformer(tolower)) # convert to lowercase
+corpus <- tm_map(corpus, removeNumbers) # remove digits
+corpus <- tm_map(corpus, removePunctuation) # remove punctuation
+corpus <- tm_map(corpus, removeWords, stopwords('english')) # remove stopwords
+corpus <- tm_map(corpus, stripWhitespace) # strip extra whitespace
+
+# example document after pre-processing
+corpus[[20]]$content
+
+# create term document matrix (tdm)
+tdm <- DocumentTermMatrix(corpus, control = list(weighting = function(x) weightTfIdf(x, normalize = FALSE)))
+
+# inspecting the tdm
+dim(tdm)
+
+```
+
+Split into training and testing.
+```{r}
+N = nrow(tdm)
+
+table(tdm$is.positive)
+
+set.seed(1234)
+idx_train = sample(seq_len(N), size=floor(0.75 * N))
+
+df_all = as.data.frame(as.matrix(tdm))
+
+df_all$is.positive = sample_df$overall >= 5
+df_all$is.positive = factor(df_all$is.positive, labels = c("yes", "no"))
+
+df_train = df_all[idx_train, ]
+df_test = df_all[-idx_train, ]
+```
+
+
+
+```{r}
+library(caret)
+
+# set resampling scheme
+ctrl <- trainControl(method="repeatedcv", number = 10, repeats = 3) #,classProbs=TRUE)
+
+# fit a kNN model using the weighted (td-idf) term document matrix
+# tuning parameter: K
+
+idx = which(colnames(df_train)=="is.positive")
+x = df_train[,-idx]
+y = df_train[,idx]
+```
+
+```{r}
+set.seed(100)
+knn <- train(x= x, y=y, method = "knn", trControl = ctrl) #, tuneLength = 20)
+knn
+knn$finalModel
+
+set.seed(100)
+dt <- train(x= x, y=y, method = "rpart", trControl = ctrl) #, tuneLength = 20)
+df
+dt$finalModel
+
+
+library(rpart)
+library(rpart.plot)
+rpart.plot(dt$finalModel, extra=2)
+
+
+set.seed(100)
+svm <- train(x= x, y=y, method = "svmRadial", trControl = ctrl) #, tuneLength = 20)
+svm
+svm$finalModel
+```
+
+
+```{r}
+
+
+# predict on test data
+knn.tfidf.predict <- predict(knn.tfidf, newdata = tdm_test)
+
+##################################################################
+# ---------------------------------------------------------------
+##################################################################
+
+# fit a kNN model using the unweighted TDM
+# tuning parameter: K
+set.seed(100)
+knn <- train(doc.class ~ ., data = tdmTrain, method = "knn", trControl = ctrl) #, tuneLength = 20)
+
+# predict on test data
+knn.predict <- predict(knn, newdata = tdmTest)
 
 ```
 

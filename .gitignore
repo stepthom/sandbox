@@ -1,1 +1,6 @@
 out
+.DS_Store
+.Rhistory
+.ipynb_checkpoints/
+arules.nb.html
+*.html
