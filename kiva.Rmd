@@ -42,26 +42,13 @@ knitr::include_graphics("kivaloans.jpg")
 [Kiva Microfunds](https://www.kiva.org/) is a non-profit that allows people to lend money to low-income entrepreneurs and students around the world. Started in 2005, Kiva has crowd-funded millions of loans with a repayment rate of 98% to 99%.
 
 
-Kiva includes both traditional demographic information, such as gender and location, as well as personal stories on each borrower because Kiva wants lenders to connect with the borrowers on a human level. An example:
+At Kiva, each loan request includes both traditional demographic information, such as gender and location, as well as personal stories on each borrower because Kiva wants lenders to connect with the borrowers on a human level. An example of a personal story:
 
 *Evelyn is 40 years old and married with 3 kids. She is in the Karura Hope women group and her life has been changed by the first KIVA loan she received last year which she is completing this quarter. Before she received the loan, she used to sell 9 litres of milk daily to local residents. After receiving the loan she bought iron sheets, five cement packets, one lorry of sand, some ballast and animal feed for her cows and improved her cow shed. Today she sells a daily average of 40 litres of milk to the Kiamba Dairy cooperative society, which is affiliated to the Kenya Cooperative Creameries at a cost of USD 0.28 per litre. Her daily farming has really grown. Evelyn intends to buy another dairy cow and a tank of water for home consumption and for her cows. She intends to repay in monthly installments.*
 
 Despite her uplifting story, and her previous successful loan, Evelyn defaulted on her next loan of 900 USD.
 
-In this case study, we will explore past Kiva loans and build a prediction model (in particular, a decision tree classifier) to predict which future borrowers will pay back loans, and which will default. A key question we will explore is: does adding text (i.e., the personal stories) to the prediction model increase or decrease the model's prediction power?
-
-This case study will provide lots of data, tables, and graphs, but is intentionally light on commentary, analysis, and decision making. That's your job!
-
-
-## Case Discussion Questions
-
-At the end of this case study, we will have a group discussion around the following questions:
-
-1. Does text data help in predicting which loan seeker will default?
-2. Which words are most biased towards defaulting? Is this expected/intuitive?
-3. According to the decision tree prediction models, what variables best predict a default?
-4. As a decision maker, would you recommend the use of textual data in your prediction models?
-5. As a lender, what other information would you like to have?
+In this case study, we will explore past Kiva loans and use them to build a prediction model (in particular, a decision tree classifier) that will be able to predict which future borrowers will pay back loans, and which will default. 
 
 
 # Kiva Background
@@ -808,6 +795,27 @@ print(sprintf("Specificity: %.3f", Specificity(y_true=predicted, y_pred=actual))
 
 <P style="page-break-before: always">
 \newpage
+
+
+## Case Discussion Questions
+
+Please be prepared to discuss the following questions.
+
+### Technical
+
+1. Does text data help in predicting which borrower will default?
+2. Which words/phrases are most biased towards defaulting? Is this expected/intuitive?
+3. According to the decision tree prediction models, which variables best predict a default?
+5. What additional information might lead to a better predictive model?
+
+
+### Managerial
+
+Suppose that Kiva would like to operationalize the prediction model. They start by showing the predicted risk factor along side each borrower's loan request on the website.
+
+1. What technical challenges and risks do you envision?
+2. What procedural challenges and risks do you envision?
+3. How else might Kiva operationalize the model?
 
 
 # Appendix: Further Reading
