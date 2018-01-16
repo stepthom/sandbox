@@ -14,7 +14,7 @@ output:
 
 ```{r}
 if (!require("pacman")) install.packages("pacman")
-pacman::p_load(tidytext, tidyverse, cleanNLP, lubridate, 
+pacman::p_load(tidytext, tidyverse, cleanNLP, lubridate, RWeka,
                stringr, scales, tm, rpart, rpart.plot, MLmetrics, stringi)
 ```
 
@@ -23,12 +23,15 @@ pacman::p_load(tidytext, tidyverse, cleanNLP, lubridate,
 ```{r}
 imdb = read_delim("all.imdb.pipe.csv", delim="|", quote="")
 
+
 # Give each row a unique id
 imdb <- imdb %>%
   mutate(id = 1:nrow(imdb)) %>%
-  select(id, everything())
+  select(id, everything()) %>%
+  rename(sentiment.score = sentiment) # Rename, because we don't want this column to be confused with the word "sentiment" in our TDM later.
 
 dim(imdb)
+head(imdb)
 
 # For now, just take a fraction
 set.seed(123)
@@ -70,7 +73,7 @@ imdb %>%
   filter(uid == 24)
 
 imdb %>%
-  group_by(sentiment) %>%
+  group_by(sentiment.score) %>%
   summarize(count=n())
 ```
 
@@ -80,7 +83,7 @@ imdb %>%
 ```{r}
 tidy <- imdb %>% 
   unnest_tokens(word, review)
-tidy
+head(tidy)
 ```
 
 
@@ -108,7 +111,7 @@ word_freqs %>%
 Sentiment distribution
 ```{r}
 tidy %>%
-  group_by(sentiment) %>%
+  group_by(sentiment.score) %>%
   summarize(n = n()) %>%
   mutate(freq= n/sum(n))
 ```
@@ -117,12 +120,12 @@ tidy %>%
 Most positive and negative words
 ```{r}
 sentiment_words_count = tidy %>% 
-  group_by(sentiment, word) %>%
+  group_by(sentiment.score, word) %>%
   summarize(count=n()) %>%
   arrange(desc(count))
 
 log_ratios = sentiment_words_count %>% 
-  spread (sentiment, count) %>%
+  spread (sentiment.score, count) %>%
   mutate(negative = ifelse(is.na(negative), 0, negative)) %>%
   mutate(positive = ifelse(is.na(positive), 0, positive)) %>%
   mutate(total=negative+positive) %>%
@@ -159,12 +162,12 @@ tidy_tri <- imdb %>%
 
 # Most positive and negative words
 sentiment_words_count_tri = tidy_tri %>% 
-  group_by(sentiment, word) %>%
+  group_by(sentiment.score, word) %>%
   summarize(count=n()) %>%
   arrange(desc(count))
 
 log_ratios_tri = sentiment_words_count_tri %>% 
-  spread (sentiment, count) %>%
+  spread (sentiment.score, count) %>%
   mutate(negative = ifelse(is.na(negative), 0, negative)) %>%
   mutate(positive = ifelse(is.na(positive), 0, positive)) %>%
   mutate(total=negative+positive) %>%
@@ -206,7 +209,7 @@ if (use_tidy == TRUE) {
   # First, need to get the counts of each polarizing word in each doc
   tidy_counts = tidy %>%
     filter(word %in% top_log_ratios$word) %>% # only keep most polarizing words
-    group_by(id, uid, sentiment, word) %>%
+    group_by(id, uid, sentiment.score, word) %>%
     summarize(count = n())
   
   # Make the DTM
@@ -226,9 +229,16 @@ if (use_tidy == TRUE) {
   
   corpus <- VCorpus(VectorSource(dtm_list))
 } else {
-  sourceData <- VectorSource(imdb$review)
-  corpus <- VCorpus(sourceData)
+  
+  # To retain the metadata, use a custom reader.
+  m <- list(content = "review", id = "id", 
+            score="score", sentiment.score = "sentiment.score", uid = "uid")
+  myReader <- readTabular(mapping = m)
+  corpus <- Corpus(DataframeSource(imdb), readerControl = list(reader = myReader))
 }
+str(corpus)
+
+corpus[[1]]
 
 corpus[[1]]$content
 corpus[[2]]$content
@@ -256,9 +266,9 @@ BigramTokenizer  <- function(x) {
 dtm <- DocumentTermMatrix(corpus, 
                           control = list(tokenize = BigramTokenizer, weighting = function(x) weightTfIdf(x, normalize = FALSE)))
 
-
 dtm$dimnames$Terms
 inspect(dtm)
+dim(dtm)
 
 # Only keep the top features
 dtm1 = removeSparseTerms(dtm, .994)
@@ -269,6 +279,8 @@ dtm1$dimnames$Terms
 ```{r}
 # Convert the dtm to a dataframe, so we can pass it into some classifiers
 df <- as.data.frame(as.matrix(dtm1))
+str(df)
+rownames(df)
 
 # Get the truth label.
 # How I do this is a bit wonky. What we have to do is append a column to our df 
@@ -276,14 +288,16 @@ df <- as.data.frame(as.matrix(dtm1))
 # - Create a new dataframe with just the id and the label
 # - Join that new dataframe to the one above, by id
 
-labels = tidy %>%
-  group_by(id) %>%
-  summarize(sentiment=max(sentiment)) %>%
-  as.data.frame()
+labels = imdb %>%
+  select(id, sentiment.score)
 
 rownames(labels) <- labels[,1]
 labels[,1] <- NULL
-df_l = merge(df, labels, by="row.names", all.x=TRUE)
+head(labels)
+head(df)
+row.names(labels)
+
+df_l = merge(df, labels, by.x="row.names", by.y="id", all.x=TRUE)
 df_l[,1] <- NULL # Don't want the pesky "RowNames" column hanging around
 head(df_l)
 ```
@@ -292,12 +306,42 @@ Split into training and testing.
 
 ```{r}
 # Training and testing
-smp_size <- floor(0.75 * nrow(df_l))
+N = nrow(df_l)
+N
+smp_size <- floor(0.75 * N)
+smp_size
 set.seed(123)
 train_ind <- sample(seq_len(nrow(df_l)), size = smp_size)
+length(train_ind)
 
 train <- df_l[train_ind, ]
 test <- df_l[-train_ind, ]
+
+train$sentiment.score
+
+dim(train)
+dim(test)
+table(train$sentiment.score)
+table(test$sentiment.score)
+head(train)
+
+# For outputting to the slide
+s = train[1:4,]
+s$sentiment.score
+rownames(s)
+s$accent
+s$`bad movi`
+s$`cant believ`
+s$`bad movi`
+
+sort(s[1,], decreasing=T)
+sort(s[2,], decreasing=T)
+sort(s[3,], decreasing=T)
+sort(s[4,], decreasing=T)
+
+
+ids = rownames(train)[1:5]
+ids
 ```
 
 Decision Trees.
@@ -305,12 +349,22 @@ Decision Trees.
 ```{r}
 library(rpart)
 library(rpart.plot)
-tree <- rpart(sentiment ~ ., data=train)
+head(train)
+tree <- rpart(sentiment.score ~ ., data=train)
 tree
-rpart.plot(tree, extra=2)
+
+
+iwidth = 7
+iheight = 7
+
+theme_set(theme_gray(base_size = 18))
+rpart.plot(tree, extra=2) 
+ggsave(file="out/imdb_tree.pdf", width=iwidth, height=iheight)
+
+
 
 predicted = predict(tree, test, type="class")
-actual = test$sentiment
+actual = test$sentiment.score
 (table(predicted, actual))
 
 library(MLmetrics)
@@ -329,12 +383,12 @@ Naive Bayes
 # TODO: need to first change features to be binary and categorical
 
 library(e1071)
-nb <- naiveBayes(sentiment ~ ., data=train)
+nb <- naiveBayes(sentiment.score ~ ., data=train)
 nb
 
 predicted.nb = predict(nb, test, type="class")
 predicted.nb
-actual = test$sentiment
+actual = test$sentiment.score
 (table(predicted.nb, actual))
 
 library(MLmetrics)
