@@ -14,35 +14,40 @@ output:
 
 ```{r}
 if (!require("pacman")) install.packages("pacman")
-pacman::p_load(tidytext, tidyverse, cleanNLP, lubridate, RWeka,
+pacman::p_load(tidytext, tidyverse, cleanNLP, lubridate, RWeka, class, e1071, caret,
                stringr, scales, tm, rpart, rpart.plot, MLmetrics, stringi)
 ```
 
 # Read in the data
 
 ```{r}
-imdb = read_delim("all.imdb.pipe.csv", delim="|", quote="")
+imdb = read_delim("data/all.imdb.pipe.csv", delim="|", quote="")
 
-
-# Give each row a unique id
+# For some reason, the dataset does not have an ID per row. So let's give each row a unique id here.
 imdb <- imdb %>%
   mutate(id = 1:nrow(imdb)) %>%
-  select(id, everything()) %>%
+  dplyr::select(id, everything()) %>% # Move id to be the first column.
   rename(sentiment.score = sentiment) # Rename, because we don't want this column to be confused with the word "sentiment" in our TDM later.
 
 dim(imdb)
 head(imdb)
 
-# For now, just take a fraction
+# For now, just take a fraction, to speed up the analysis initially. Change this once you're ready to run this script for a while.
 set.seed(123)
 imdb <- imdb %>%
-  sample_frac(0.3)
+  sample_frac(0.03)
+```
+
+
+Do some initial cleaning of strange characters in the text data.
+
+```{r}
 
 # Now, I noticed that there were some weird characters in the file. Non-ascii, weird stuff.
-# I removed some in the input file, in vim, using the command:
+# I removed some in the input file itself, in vim, using the command:
 # :.,$s/[\x97]/ - /g
 #
-# I did the above for (if memory serves): \u0096, \u0097, \u0084, \u008d, \u0095, and \u0091.
+# I did the above for (if memory serves correctly): \u0096, \u0097, \u0084, \u008d, \u0095, and \u0091.
 #
 # For good measure, let's remove a few more, here in R, below:
 
@@ -60,6 +65,8 @@ imdb$review= gsub('¨', '"', imdb$review, perl=T)
 head(imdb)
 imdb[4,]$review
 ```
+
+Some simple descriptive stats.
 
 ```{r}
 # This is not really important. I was just 
@@ -87,9 +94,10 @@ head(tidy)
 ```
 
 
-# Some descriptive stats
+Some more descriptive stats, the tidy way.
 
 Most frequent words.
+
 ```{r}
 word_freqs = tidy %>%
   group_by(word) %>%
@@ -101,14 +109,16 @@ word_freqs %>%
 ```
 
 
-Least frequent words 
+Least frequent words.
+
 ```{r}
 word_freqs %>%
   top_n(-50)
 ```
 
 
-Sentiment distribution
+Sentiment distribution.
+
 ```{r}
 tidy %>%
   group_by(sentiment.score) %>%
@@ -117,7 +127,8 @@ tidy %>%
 ```
 
 
-Most positive and negative words
+Most positive and negative words.
+
 ```{r}
 sentiment_words_count = tidy %>% 
   group_by(sentiment.score, word) %>%
@@ -154,7 +165,7 @@ log_ratios %>%
 ```
 
 
-Log odd ratio chart for n-grams
+Log odd ratio chart for n-grams.
 
 ```{r}
 tidy_tri <- imdb %>% 
@@ -189,20 +200,27 @@ log_ratios_tri %>%
 
 # Build a classifier.
 
-Create the feature matrix.
+## Create the feature matrix.
 
 There's a lot of features we can have for each document:
-- Word frequencies of all words
-- Word frequencies of only the most frequent words
-- Word frequencies of only the most polarizing words
-- Any of the above, except with binary word frequencies or some other weighting scheme
+
+- Individual words (weighted by term frequency, binary frequency, TF-IDF, ...)
+- n-grams (again, with various weights)
 - Topic memberships (after running e.g., LDA)
 - Cluster memberships (after running e.g., kmeans)
+- Text length
 
-For now, we'll go with the third approach. We'll start by creating a DTM.
+We'll explore a few different features.
+
+The overall strategy will be to create a DocumentTermMatrix (from the `tm`) package and input that into some ML models to do the classification.
+
+
+First, create the DTM.
 
 ```{r}
-
+# We could transform our tidy dataframe directly into a TM DTM, using the cast_dtm function. Or, we can
+# create the DTM from the original data. Here, we should how to do it both ways. Set the `use_tidy` flag
+# below to experiment with each way.
 
 use_tidy = FALSE
 if (use_tidy == TRUE) {
@@ -236,10 +254,9 @@ if (use_tidy == TRUE) {
   myReader <- readTabular(mapping = m)
   corpus <- Corpus(DataframeSource(imdb), readerControl = list(reader = myReader))
 }
-str(corpus)
 
-corpus[[1]]
 
+# Output some example content, before preprocessing.
 corpus[[1]]$content
 corpus[[2]]$content
 corpus[[3]]$content
@@ -250,52 +267,39 @@ corpus <- tm_map(corpus, content_transformer(tolower))
 corpus <- tm_map(corpus, removeNumbers)
 corpus <- tm_map(corpus, removePunctuation)
 corpus <- tm_map(corpus, removeWords, stopwords('english'))
-corpus <- tm_map(corpus, removeWords, c("\u0085", "br"))
+corpus <- tm_map(corpus, removeWords, c("br"))
 corpus <- tm_map(corpus, stemDocument, language = "english") 
 corpus <- tm_map(corpus, stripWhitespace)
 
+# Output the same example content, after preprocessing.
 corpus[[1]]$content
 corpus[[2]]$content
 corpus[[3]]$content
 corpus[[4]]$content
 
-BigramTokenizer  <- function(x) {
+# When we build the DTM, we want n-grams!
+NgramTokenizer  <- function(x) {
   RWeka::NGramTokenizer(x, RWeka::Weka_control(min = 1, max = 3))
 }
 
 dtm <- DocumentTermMatrix(corpus, 
-                          control = list(tokenize = BigramTokenizer, weighting = function(x) weightTfIdf(x, normalize = FALSE)))
+                          control = list(tokenize = NgramTokenizer, 
+                                         weighting = function(x) weightTfIdf(x, normalize = FALSE)))
 
-dtm$dimnames$Terms
-inspect(dtm)
 dim(dtm)
 
-# Only keep the top features
-dtm1 = removeSparseTerms(dtm, .994)
-dim(dtm1)
-dtm1$dimnames$Terms
+# Only keep the top features, to keep the feature matrix reasonable in size.
+dtm = removeSparseTerms(dtm, .994)
+dim(dtm)
 ```
 
+Convert the dtm to a dataframe, so we can pass it into some ML methods.
 ```{r}
-# Convert the dtm to a dataframe, so we can pass it into some classifiers
-df <- as.data.frame(as.matrix(dtm1))
-str(df)
-rownames(df)
+df <- as.data.frame(as.matrix(dtm))
 
-# Get the truth label.
-# How I do this is a bit wonky. What we have to do is append a column to our df 
-# above that is the truth label. To do this, we'll:
-# - Create a new dataframe with just the id and the label
-# - Join that new dataframe to the one above, by id
-
+# Add the truth label (i.e., sentiment.score) to the dataframe.
 labels = imdb %>%
-  select(id, sentiment.score)
-
-rownames(labels) <- labels[,1]
-labels[,1] <- NULL
-head(labels)
-head(df)
-row.names(labels)
+  dplyr::select(id, sentiment.score)
 
 df_l = merge(df, labels, by.x="row.names", by.y="id", all.x=TRUE)
 df_l[,1] <- NULL # Don't want the pesky "RowNames" column hanging around
@@ -307,95 +311,119 @@ Split into training and testing.
 ```{r}
 # Training and testing
 N = nrow(df_l)
-N
 smp_size <- floor(0.75 * N)
-smp_size
 set.seed(123)
 train_ind <- sample(seq_len(nrow(df_l)), size = smp_size)
-length(train_ind)
+
 
 train <- df_l[train_ind, ]
 test <- df_l[-train_ind, ]
 
-train$sentiment.score
+train$sentiment.score = as.factor(train$sentiment.score)
+test$sentiment.score = as.factor(test$sentiment.score)
 
-dim(train)
-dim(test)
 table(train$sentiment.score)
 table(test$sentiment.score)
-head(train)
-
-# For outputting to the slide
-s = train[1:4,]
-s$sentiment.score
-rownames(s)
-s$accent
-s$`bad movi`
-s$`cant believ`
-s$`bad movi`
-
-sort(s[1,], decreasing=T)
-sort(s[2,], decreasing=T)
-sort(s[3,], decreasing=T)
-sort(s[4,], decreasing=T)
-
-
-ids = rownames(train)[1:5]
-ids
 ```
+
+
+Output a sample of the data, for the slides.
+
+```{r}
+# The TF-IDF scores for the top features of the first doc
+sort(as.data.frame(as.matrix(dtm[1,])), decreasing=TRUE)[1:10]
+
+# First, just look at a few docs, and see which words are highest rated.
+idxs = c(1, 2, 3, 4)
+s = train[idxs,]
+
+for (i in idxs){
+  print(i)
+  print(sort(s[i,which(s[i,]>0)], decreasing=T))
+}
+
+# Then, choose some words/features manually, and see what the values are in the sample docs.
+example_features = c("success", "awkward", "sex", "new", "shock", "better", "cant believ", "young woman", "work well")
+for (example_feature in example_features){
+  print("")
+  print(example_feature)
+  print(s[[example_feature]])
+}
+```
+
+
+This function will print out some performance stats for a given model's predictions.
+
+```{r}
+printPerf = function(predicted, actual){
+  (table(predicted, actual))
+
+  print(sprintf("Accuracy:    %.3f", Accuracy(y_true=actual, y_pred=predicted)))
+  print(sprintf("Precision:   %.3f", Precision(y_true=actual, y_pred=predicted)))
+  print(sprintf("Recall:      %.3f", Recall(y_true=actual, y_pred=predicted)))
+  print(sprintf("F1 Score:    %.3f", F1_Score(predicted, actual)))
+  print(sprintf("Sensitivity: %.3f", Sensitivity(y_true=actual, y_pred=predicted)))
+  print(sprintf("Specificity: %.3f", Specificity(y_true=predicted, y_pred=actual)))
+}
+```
+
 
 Decision Trees.
 
 ```{r}
-library(rpart)
-library(rpart.plot)
-head(train)
+set.seed(123)
 tree <- rpart(sentiment.score ~ ., data=train)
 tree
-
-
-iwidth = 7
-iheight = 7
-
-theme_set(theme_gray(base_size = 18))
 rpart.plot(tree, extra=2) 
-ggsave(file="out/imdb_tree.pdf", width=iwidth, height=iheight)
-
-
 
 predicted = predict(tree, test, type="class")
-actual = test$sentiment.score
-(table(predicted, actual))
-
-library(MLmetrics)
-print(sprintf("Accuracy:    %.3f", Accuracy(y_true=actual, y_pred=predicted)))
-print(sprintf("Precision:   %.3f", Precision(y_true=actual, y_pred=predicted)))
-print(sprintf("Recall:      %.3f", Recall(y_true=actual, y_pred=predicted)))
-print(sprintf("F1 Score:    %.3f", F1_Score(predicted, actual)))
-print(sprintf("Sensitivity: %.3f", Sensitivity(y_true=actual, y_pred=predicted)))
-print(sprintf("Specificity: %.3f", Specificity(y_true=predicted, y_pred=actual)))
+printPerf(predicted, test$sentiment.score)
 ```
 
 
-Naive Bayes
+Naive Bayes.
+
 ```{r}
-
-# TODO: need to first change features to be binary and categorical
-
-library(e1071)
+set.seed(123)
 nb <- naiveBayes(sentiment.score ~ ., data=train)
-nb
 
 predicted.nb = predict(nb, test, type="class")
-predicted.nb
-actual = test$sentiment.score
-(table(predicted.nb, actual))
+printPerf(predicted, test$sentiment.score)
 
-library(MLmetrics)
-print(sprintf("Accuracy:    %.3f", Accuracy(y_true=actual, y_pred=predicted.nb)))
-print(sprintf("Precision:   %.3f", Precision(y_true=actual, y_pred=predicted.nb)))
-print(sprintf("Recall:      %.3f", Recall(y_true=actual, y_pred=predicted.nb)))
-print(sprintf("F1 Score:    %.3f", F1_Score(predicted.nb, actual)))
-print(sprintf("Sensitivity: %.3f", Sensitivity(y_true=actual, y_pred=predicted.nb)))
-print(sprintf("Specificity: %.3f", Specificity(y_true=predicted.nb, y_pred=actual)))
+# Look at some of the individual tables like so:
+nb$tables$steve
+```
+
+Support Vector Machines.
+
+```{r}
+set.seed(123)
+sv <- svm(sentiment.score ~ ., data=train)
+
+predicted.svm = predict(sv, test, type="class")
+printPerf(predicted, test$sentiment.score)
+
+```
+
+
+KNN
+
+Warning: the following takes a LONG time, so I've turned off this cell by default.
+
+```{r eval=FALSE, include=FALSE}
+# knn in caret requires you split the data into a feature matrix (x) and the label (y)
+idx = which(colnames(train)=="sentiment.score")
+x = train[,-idx]
+dim(x)
+y = train[,idx]
+length(y)
+
+library(caret)
+set.seed(100)
+ctrl <- trainControl(method="repeatedcv", number = 2, repeats = 1) #,classProbs=TRUE)
+
+knn <- train(x=x, y=y, method = "knn", trControl = ctrl)
+
+predicted.knn = predict(knn, test, type="class")
+printPerf(predicted.knn, test$sentiment.score)
 ```
