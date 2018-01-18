@@ -15,7 +15,12 @@ output:
 ```{r}
 if (!require("pacman")) install.packages("pacman")
 pacman::p_load(tidytext, tidyverse, cleanNLP, lubridate, RWeka, class, e1071, caret,
-               stringr, scales, tm, rpart, rpart.plot, MLmetrics, stringi)
+               stringr, scales, rpart, rpart.plot, MLmetrics, stringi, devtools)
+
+if (packageVersion("tm") != "0.7.1"){
+  install_version("tm", version = "0.7.1", repos = "http://cran.us.r-project.org")
+}
+library(tm)
 ```
 
 # Read in the data
@@ -24,10 +29,14 @@ pacman::p_load(tidytext, tidyverse, cleanNLP, lubridate, RWeka, class, e1071, ca
 imdb = read_delim("data/all.imdb.pipe.csv", delim="|", quote="")
 
 # For some reason, the dataset does not have an ID per row. So let's give each row a unique id here.
+# Also, tm's DataframeSouce (used later) requires that the first column be named "doc_id", and the 
+# second column be named "text". We also need to rename "sentiment" to "sentiment.id" because we don't 
+# want this column to be confused with the word "sentiment" in our TDM later.
 imdb <- imdb %>%
-  mutate(id = 1:nrow(imdb)) %>%
-  dplyr::select(id, everything()) %>% # Move id to be the first column.
-  rename(sentiment.score = sentiment) # Rename, because we don't want this column to be confused with the word "sentiment" in our TDM later.
+  mutate(doc_id = 1:nrow(imdb)) %>%
+  rename(text = review) %>% 
+  dplyr::select(doc_id, text, everything()) %>%
+  rename(sentiment.score = sentiment)
 
 dim(imdb)
 head(imdb)
@@ -35,7 +44,7 @@ head(imdb)
 # For now, just take a fraction, to speed up the analysis initially. Change this once you're ready to run this script for a while.
 set.seed(123)
 imdb <- imdb %>%
-  sample_frac(0.03)
+  sample_frac(0.05)
 ```
 
 
@@ -51,19 +60,19 @@ Do some initial cleaning of strange characters in the text data.
 #
 # For good measure, let's remove a few more, here in R, below:
 
-imdb$review = stringi::stri_trans_general(imdb$review, "latin-ascii")
-imdb$review= gsub('\\R', '', imdb$review, perl=T)
-imdb$review= gsub('£|¢|§|¦|·|¡|°|¿', ' ', imdb$review, perl=T)
-imdb$review= gsub('´', '\'', imdb$review, perl=T)
-imdb$review= gsub('¨', '"', imdb$review, perl=T)
+imdb$text = stringi::stri_trans_general(imdb$text, "latin-ascii")
+imdb$text= gsub('\\R', '', imdb$text, perl=T)
+imdb$text= gsub('£|¢|§|¦|·|¡|°|¿', ' ', imdb$text, perl=T)
+imdb$text= gsub('´', '\'', imdb$text, perl=T)
+imdb$text= gsub('¨', '"', imdb$text, perl=T)
 
 
 # BTW, here is how I searched for those non-ascii characters:
-# grep("I_WAS_NOT_ASCII", iconv(imdb$review, "latin1", "ASCII", sub="I_WAS_NOT_ASCII"))
+# grep("I_WAS_NOT_ASCII", iconv(imdb$text, "latin1", "ASCII", sub="I_WAS_NOT_ASCII"))
 
 # Inspect
 head(imdb)
-imdb[4,]$review
+imdb[4,]$text
 ```
 
 Some simple descriptive stats.
@@ -89,7 +98,7 @@ imdb %>%
 
 ```{r}
 tidy <- imdb %>% 
-  unnest_tokens(word, review)
+  unnest_tokens(word, text)
 head(tidy)
 ```
 
@@ -169,7 +178,7 @@ Log odd ratio chart for n-grams.
 
 ```{r}
 tidy_tri <- imdb %>% 
-  unnest_tokens(word, review, token="ngrams", n=2)
+  unnest_tokens(word, text, token="ngrams", n=2)
 
 # Most positive and negative words
 sentiment_words_count_tri = tidy_tri %>% 
@@ -227,12 +236,12 @@ if (use_tidy == TRUE) {
   # First, need to get the counts of each polarizing word in each doc
   tidy_counts = tidy %>%
     filter(word %in% top_log_ratios$word) %>% # only keep most polarizing words
-    group_by(id, uid, sentiment.score, word) %>%
+    group_by(doc_id, uid, sentiment.score, word) %>%
     summarize(count = n())
   
   # Make the DTM
   dtm <- tidy_counts %>%
-    cast_dtm(id, word, count)
+    cast_dtm(doc_id, word, count)
   dim(dtm)
   inspect(dtm)
   
@@ -247,9 +256,8 @@ if (use_tidy == TRUE) {
   
   corpus <- VCorpus(VectorSource(dtm_list))
 } else {
-  
-  # To retain the metadata, use a custom reader.
-  m <- list(content = "review", id = "id", 
+   # To retain the metadata, use a custom reader.
+  m <- list(content = "text", id = "doc_id", 
             score="score", sentiment.score = "sentiment.score", uid = "uid")
   myReader <- readTabular(mapping = m)
   corpus <- Corpus(DataframeSource(imdb), readerControl = list(reader = myReader))
@@ -299,9 +307,9 @@ df <- as.data.frame(as.matrix(dtm))
 
 # Add the truth label (i.e., sentiment.score) to the dataframe.
 labels = imdb %>%
-  dplyr::select(id, sentiment.score)
+  dplyr::select(doc_id, sentiment.score)
 
-df_l = merge(df, labels, by.x="row.names", by.y="id", all.x=TRUE)
+df_l = merge(df, labels, by.x="row.names", by.y="doc_id", all.x=TRUE)
 df_l[,1] <- NULL # Don't want the pesky "RowNames" column hanging around
 head(df_l)
 ```
