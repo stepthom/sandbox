@@ -135,3 +135,90 @@ inspect(subset(rules, subset=items %ain% c("whole milk","yogurt") & confidence >
 ```{r}
 inspect(subset(rules, subset= lhs %pin% "bread" & rhs %in% "whole milk" & confidence > .9))
 ```
+
+# Making up some transaction data
+
+For use in class, I wanted to make up some data to describe different situations.
+
+
+Looking for a rule with high support, high conf, and high lift. E.g.:
+- Support of {A} is 70%
+- Support of {B} is 50%
+- Support of {A,B} is 50%
+- Confidence of {A}->{B} is 100% 
+- Lift is therefore 2.0
+
+Looking for a rule with high support, high conf, and low lift. I.e.:
+- Support of {A} is 100%
+- Support of {B} is 50%
+- Support of {A,B} is 50%
+- Confidence of {A}->{B} is 50% 
+- Lift is therefore 1.0
+
+```{r}
+a_list <- list(
+c("milk","bread","carrot"),
+c("milk","bread"),
+c("milk","bread","meat"),
+c("milk","diamonds"),
+c("milk","bread","meat","diamonds"),
+c("milk", "meat"),
+c("milk"),
+c("bread"),
+c("bread", "meat"),
+c("milk","bread", "diamonds"),
+c("milk","bread", "carrot"),
+c("milk","bread"),
+c("diamonds", "meat"),
+c("diamonds", "meat"),
+c("diamonds", "meat"),
+c("diamonds", "meat"),
+c("diamonds", "meat"),
+c("diamonds", "meat"),
+c("diamonds", "meat"),
+c("diamonds", "meat")
+)
+## set transaction names
+names(a_list) <- paste("Tr",c(1:5), sep = "")
+## coerce into transactions
+trans1 <- as(a_list, "transactions")
+## analyze transactions
+summary(trans1)
+#image(trans1)
+rules <- apriori(trans1, parameter = list(supp = 0.001, conf = 0.001, target = "rules"))
+```
+
+
+```{r}
+inspect(sort(subset(rules,  
+                    subset=lhs %in% 'bread' ),
+                    by = 'lift',
+                    decreasing = T))
+```
+
+Let's look at milk-> bread. Expect high, high, high
+```{r}
+inspect(sort(subset(rules, 
+                    subset=lhs %in% 'milk' & rhs %in% 'bread'),
+                    by = 'lift',
+                    decreasing = T))
+```
+
+```{r}
+inspect(sort(subset(rules, 
+                    subset=lhs %in% 'diamonds' & confidence > .0),
+                    by = 'lift',
+                    decreasing = T))
+```
+
+```{r}
+inspect(head(rules, n=42, by = "support"))
+```
+
+```{r}
+inspect(head(rules, n=42, by = "confidence"))
+```
+
+```{r}
+inspect(head(rules, n=42, by = "lift"))
+```
