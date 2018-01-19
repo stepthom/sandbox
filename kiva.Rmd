@@ -31,7 +31,6 @@ library(kableExtra)
 
 
 \hrulefill
-<hr/>
 
 ```{r, echo=FALSE, out.width = "150px"}
 knitr::include_graphics("kivaloans.jpg")
@@ -801,21 +800,15 @@ print(sprintf("Specificity: %.3f", Specificity(y_true=predicted, y_pred=actual))
 
 Please be prepared to discuss the following questions.
 
-### Technical
-
-1. Does text data help in predicting which borrower will default?
-2. Which words/phrases are most biased towards defaulting? Is this expected/intuitive?
-3. According to the decision tree prediction models, which variables best predict a default?
-5. What additional information might lead to a better predictive model?
-
-
-### Managerial
-
-Suppose that Kiva would like to operationalize the prediction model. They start by showing the predicted risk factor along side each borrower's loan request on the website.
-
-1. What technical challenges and risks do you envision?
-2. What procedural challenges and risks do you envision?
-3. How else might Kiva operationalize the model?
+1. What is Kiva's value proposition?
+2. What is the primary innovation that Kiva brought to its industry?
+3. How does Kiva make money?
+4. What factors might go into a lender's decision to lend money to a borrower?
+5. How does text data affect a prediction model's ability to predict default? 
+6. Which words/phrases are most biased towards defaulting? Is this expected/intuitive?
+7. According to the decision tree prediction models, which variables best predict a default?
+8. What additional information might lead to a better predictive model?
+9. How would you operationalize the prediction model at Kiva? What technical challenges and risks do you envision? What procedural challenges and risks do you envision?
 
 
 # Appendix: Further Reading

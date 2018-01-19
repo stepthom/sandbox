@@ -15,46 +15,70 @@ output:
 knitr::opts_chunk$set(echo = FALSE, warning=FALSE, message=FALSE, fig.align='center')
 ```
 
-
 # Case Discussion Questions
 
+Please be prepared to discuss the following questions.
+
+1. What is Kiva's value proposition?
 
 
-## Technical
 
-1. Does text data help in predicting which borrower will default?
-
-
-Answer. I think the evidence points to yes.
+2. What is the primary innovation that Kiva brought to its industry?
 
 
-2. Which words are most biased towards defaulting? Is this expected/intuitive?
 
-Answer. 
+3. How does Kiva make money?
 
-
-3. According to the decision tree prediction models, which variables best predict a default?
-
-Answer. 
+Kiva doesn't. They're a not-for-profit. They cover their own costs by donations, grants, etc.
 
 
-5. What additional information might lead to a better predictive model?
+4. What factors might go into a lender's decision to lend money to a borrower?
 
-Answer. 
-
-
-## Managerial
-
-Suppose that Kiva would like to operationalize the prediction model. They start by showing the predicted risk factor along side each borrower's loan request on the website.
-
-1. What technical challenges and risks do you envision?
-
-Answer. The model must perform the predition in a timely manner. There must be sufficient integration between the model and the webpage. The model must be constantly updated to remain current.
+- Loan amount
+- Country
+- Purpose
+- Repayment history
+- Backed by partner or not
+- Feeling good about life in general
 
 
-2. What procedural challenges and risks do you envision?
+5. How does text data affect a prediction model's ability to predict default? 
 
-Answer. 
+It increases the accuracy.
+
+
+6. Which words/phrases are most biased towards defaulting? Is this expected/intuitive?
+
+Biased towards payment: microfinance, mifex.org, esperanza.
+
+Biased towards non-payment: cow, dairy, cows, mary, church, maize, intends, repay
+
+
+7. According to the decision tree prediction models, which variables best predict a default?
+
+
+
+8. What additional information might lead to a better predictive model?
+
+Ideas from previous classes:
+- Loan history
+- separate models per country
+- translating all to english
+- extracting age from text
+- extract number of children from text.
+
+
+9. How would you operationalize the prediction model at Kiva? What technical challenges and risks do you envision? What procedural challenges and risks do you envision?
+
+One way to deploy the model is to publish the prediction next to each loan request.
+
+Some technical challenges:
+
+- The model must perform the predition in a timely manner. 
+- There must be sufficient integration between the model and the webpage. 
+- The model must be constantly updated to remain current.
+
+Some procedural challenges:
 
 - Borrowers might figure out the model (i.e., which words/phrases will predict a default), and change their stories accordingly, reducing the effectivenes of the model.
 
@@ -64,15 +88,9 @@ Answer.
 
 - Overall lending might be more concentrated than it ought to be.
 
+Some other deployment ideas:
 
-3. How else might Kiva operationalize the model?
+- Another option is to use the risk factor to not allow the borrower to post the request if the model predicts below a certain threshold. 
 
-Answer. Another option is to show the risk factor to not allow the borrower to post the request if the odel predicts below a certain threshold. Another option still is to just show the predicted value to Kiva employees, who could (e.g.) use it to write a blog, report, or white paper that potential lenders could read.
+- Another option still is to just show the predicted value to Kiva employees, who could (e.g.) use it to write a blog, report, or white paper that potential lenders could read.
 
-
-
-# Appendix: Further Reading
-
-- [Kiva.org](https://www.kiva.org/). Kiva's homepage.
-- [Build.Kiva](http://build.kiva.org/). Kiva data dumps and data description.
- 
