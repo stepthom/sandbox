@@ -3,12 +3,12 @@ title: 'Document Classification Case Study: Kiva Loans'
 author: "Dr. Stephen W. Thomas, Queen's University"
 date: "July 14, 2017"
 output:
-  word_document:
-    toc: no
-    toc_depth: '2'
   pdf_document:
     highlight: pygments
     number_sections: yes
+    toc: no
+    toc_depth: '2'
+  word_document:
     toc: no
     toc_depth: '2'
 ---
@@ -38,14 +38,14 @@ At Kiva, each loan request includes both traditional demographic information, su
 
 *Evelyn is 40 years old and married with 3 kids. She is in the Karura Hope women group and her life has been changed by the first KIVA loan she received last year which she is completing this quarter. Before she received the loan, she used to sell 9 litres of milk daily to local residents. After receiving the loan she bought iron sheets, five cement packets, one lorry of sand, some ballast and animal feed for her cows and improved her cow shed. Today she sells a daily average of 40 litres of milk to the Kiamba Dairy cooperative society, which is affiliated to the Kenya Cooperative Creameries at a cost of USD 0.28 per litre. Her daily farming has really grown. Evelyn intends to buy another dairy cow and a tank of water for home consumption and for her cows. She intends to repay in monthly installments.*
 
-Despite her uplifting story, and her previous successful loan, Evelyn defaulted on her next loan of 900 USD. Could this default have been predicted and avoided?
+Despite her uplifting story, and her previous successful loan, Evelyn defaulted on her next loan of 900 USD. Could this default have been predicted and avoided? 
 
-Text Analytics provides ways to understand and organize text data. Can Kiva leverage use Text Analytics to leverage text data to build a prediction system for loan applications, thereby reducing risk?
+Kiva's data science team is especially curious if the personal stories hold any predictive value. Text Analytics provides ways to understand and organize text data. Can Kiva's data science team use Text Analytics --- ways to understand and organize text data --- to leverage the personal stories to build a prediction system for loan applications, thereby reducing risk for lenders and Kiva?
 
 
-# Kiva Background
+# Kiva's Data
 
-The key concepts in the Kiva world are:
+The key objects in the Kiva world are:
 
 - **Loan**. A loan is the most important concept at Kiva. Most other concepts are in some way related to a loan.
 
@@ -60,43 +60,49 @@ however, refrain from displaying their public information and are referred to as
 
 - **Partner.** A partner, or Kiva field partner, is usually a microfinance institution with which Kiva works to find and fund loans. Every loan at Kiva is offered by a partner to a borrower, and the partner works with Kiva to get funding for that loan from lenders.
 
-# Kiva's Data
+Kiva provides public snapshots of all loan data on their website [http://build.kiva.org](http://build.kiva.org/). The data includes the following variables:
 
 
-TODO: casual intro
+Variable    Description  
+--------    -------------- 
+id          A unique identifier for the loan.
+sector      Industry sector of borrower.
+country     Borrower's country of residence.
+gender      Borrower's gender.
+loan_amount Amount of the loan, in USD.
+non_payment Who is liable if the loan defaults: the lender, or the partner?
+en          Borrower's personal story.
+status      Whether borrower defaulted or repaid loan.
+---------   --------------
 
-TODO: Data dictionary.
+Kiva's data science team decides to use a snapshot that contains about 8,000 completed loans, of which about 4,000 were repaid and 4,000 were defaulted. Exhibit 1 contains a descriptive summary of each variable.
 
-Let's look at our sample to understand the size, shape, values, and patterns in the variables. The sample includes `r ncol(df)` variables, named: `r colnames(df)`. Each variable is explored in turn. The `en` variable is the text variable, i.e., the personal story of the loan seeker, and will be our main source of investigation. There are `r nrow(df)` records/rows/loans in our sample.
 
-# Developing a Prediction Model
+# Beyond Numbers: Adding Text Variables
 
-TODO: casual intro
+The overall goal of the data science team is to reduce risk to potential lenders, and to make sure loan resources are spent on borrowers with the highest likelihood of repaying. The team decides to build a prediction model (i.e., a _classifier_) that uses as much of the available historical data as possible in order to build an accurate model of which borrowers will repay, and which will default.
 
-TODO: de-technicalize the below.
+Most classifiers are able to accept numerical data (e.g., loan amount) and categorical data (e.g., gender, country) as inputs, but are not able to accept raw text data (e.g., en). Thus, the data science team must wrangle the text data to make it suitable for the classifier.
 
-Now that we have explored the data, it’s time to dive deeper. Which variable(s) are the biggest predictors of `status`? This is where classifier models shine. They can tell us exactly how all the variables relate to each other, and which are most important.
- 
-A decision tree is a popular classifier model in analytics. Here, the decision tree is automatically created by a machine learning algorithm as it learns simple decision rules from the data. These automatically-learned rules can then be used to both understand the variables and to predict future data. A big advantage of decision trees over other classifier models is that they are relatively simple for humans to understand and interpret.
- 
-A decision tree consists of nodes. Each node splits the data according to a rule. A rule is based on a variable in the data. For example, a rule might be “Age greater than 30.” In this case, the node splits the data by the age variable; those passengers that satisfy the rule (i.e., are greater than 30) follow the left path out of the node; the rest follow the right path out of the node. In this way, paths from the root node down to leaf nodes are created, describing the fate of certain types of passengers.
- 
-A decision tree path always starts with a root node (node number 1), which contains the most important splitting rule. Each subsequent node contains the next most important rule. After the decision tree is automatically created by the machine learning algorithm, one can use the decision tree to classify an individual by simply following a path: start at the root node and apply each rule to follow the appropriate path until you hit an end.
- 
-When creating a decision tree from data, the analyst can specify the number of nodes for the machine learning algorithm to create. More nodes leads to a more accurate model, at the cost of a more complicated and harder-to-interpret model. Likewise, fewer nodes usually leads to a less accurate model, but the model is easier to understand and interpret. 
- 
- 
-TODO: fold the below into the above
+TODO: there are many ways to do this: individual words, key phrases, topics, etc. This team uses topics.
 
-Next, we used a techinque called Latent Dirichlet Allocation (LDA) to automatically extract high-level topics from the documents. We told LDA to extract the `12` most important topics; LDA will also tell us which topics are in which documents. For example, a document might have 50% of its words come from topic 1, 25% of its words come from topic 5, and the remaining 25% of its words come from topic 12.
+The first thing the data science team does is split the text into invidual words. For example, the sentence "She has dairy cows" will be split into four words: "She", "has", "dairy", and "cows".
 
-## A first attempt
+The team then removes noise. This include fixing mispelled words, removing overly common words, and removing very rare words.
 
-First, as a baseline, we trained a decision tree classifier model without using any of the text or topics. Below is a graphical depiction of the model after it has been trained:
+The then team inputs the cleaned words into an advanced topic model, called Latent Dirichlet Allocation (LDA) to automatically extract high-level topics from the text. For example, one personal story might contain the topics "dairy, cow, milk" and "wheat, farm, field", while another personal story might include the topics "clothing, garmet, shirt" and "children, child, kid." LDA will tell us which topics are in which personal stories. Note that the LDA automatically creates the topics from scratch, based on the input text; it does not have a list of common topics from which it chooses. As a result, the topics are specific to the text data in the given dataset. The extracted topics are show in Exhibit 2. Below is a sample of the data that will be used to train the classifiers:
 
-## Adding text
+TODO: a few sample rows.
 
-We then built the same kind of decision tree classifier model as before, except now, we included the LDA topics, which were built from the text. (Note: there are many _other_ textual features we could include in this model: individual words, clusters, etc. However, we  kept it simple for now.) Below is the result.
+
+# Building the Classifiers
+
+TODO
+
+Armed with all the numeric, categorical, and text (i.e., topics) variables in the The data science teams has lots of different classifier algorithms available. For this task, the team decides to use a decision tree classifier, because of its speed, accuracy, and interpritability. 
+
+The team builds two decision tree classifiers. One is trained only on the numerical and categorical variables. The other is trained on the numerical, categorical, and text (i.e., topics) variables. This will help the team to determine if adding text to the classifiers is a good idea. Exhibit 3 shows the two classifiers and their performance.
+
 
 
 

@@ -1,8 +1,11 @@
 ---
-title: "Document Classification Case Study: Kiva Loans"
+title: 'Document Classification Case Study: Kiva Loans'
 author: "Dr. Stephen W. Thomas, Queen's University"
 date: "July 14, 2017"
 output:
+  word_document:
+    toc: no
+    toc_depth: '2'
   pdf_document:
     highlight: pygments
     number_sections: yes
@@ -14,6 +17,11 @@ output:
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = FALSE, warning=FALSE, message=FALSE, fig.align='center')
 ```
+
+# Intro
+
+- Who has used Kiva? Why did you choose Kiva? How did you choose the borrower? What was your experience like? Did you continue to lend to Kiva, and why or why not
+
 
 # Case Discussion Questions
 
