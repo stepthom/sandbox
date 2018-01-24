@@ -3,12 +3,12 @@ title: 'Document Classification Case Study: Kiva Loans'
 author: "Dr. Stephen W. Thomas, Queen's University"
 date: "July 14, 2017"
 output:
-  word_document:
-    toc: no
-    toc_depth: '2'
   pdf_document:
     highlight: pygments
     number_sections: yes
+    toc: no
+    toc_depth: '2'
+  word_document:
     toc: no
     toc_depth: '2'
 ---
@@ -20,7 +20,11 @@ knitr::opts_chunk$set(echo = FALSE, warning=FALSE, message=FALSE, fig.align='cen
 
 # Intro
 
-- Who has used Kiva? Why did you choose Kiva? How did you choose the borrower? What was your experience like? Did you continue to lend to Kiva, and why or why not
+- Who has used Kiva? 
+- Why did you choose Kiva? 
+- How did you choose the borrower? 
+- What was your experience like? 
+- Did you continue to lend to Kiva, and why or why not?
 
 
 # Case Discussion Questions
@@ -50,9 +54,9 @@ Kiva doesn't. They're a not-for-profit. They cover their own costs by donations,
 - Feeling good about life in general
 
 
-5. How does text data affect a prediction model's ability to predict default? 
+5. How does text data affect a prediction model's ability to predict a default? 
 
-It increases the accuracy.
+It increases the accuracy and all the other metrics.
 
 
 6. Which words/phrases are most biased towards defaulting? Is this expected/intuitive?
@@ -62,9 +66,13 @@ Biased towards payment: microfinance, mifex.org, esperanza.
 Biased towards non-payment: cow, dairy, cows, mary, church, maize, intends, repay
 
 
-7. According to the decision tree prediction models, which variables best predict a default?
+7. According to the decision tree models, which variables best predict a default?
 
-
+- `nonpayment`. If "parnter", then the loan very likely to be paid.
+- `Topic 8`. If present, then more likely to be paid. Topic is "children, esperanza, support, women".- 
+- `Topic 12`. If present, then more likely to be paid. Topic is "rice, farmers, baba, sector."
+- `country`. Kenya is most likely to default.
+- `loan_amount`. Large loan are more likely to be paid.
 
 8. What additional information might lead to a better predictive model?
 
