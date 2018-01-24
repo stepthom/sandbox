@@ -1,11 +1,12 @@
 ---
-title: 'Document Classification Case Study: Kiva Loans'
-author: "Dr. Stephen W. Thomas, Queen's University"
-date: "July 14, 2017"
+title: 'Using Text Analytics to Predict Loan Default'
+subtitle: "A case study of kiva.org"
+author: "Dr. Stephen W. Thomas, Smith School of Business, Queen's University"
+date: "January 2018"
 output:
   pdf_document:
     highlight: pygments
-    number_sections: yes
+    number_sections: no
     toc: no
     toc_depth: '2'
   word_document:
@@ -40,7 +41,7 @@ At Kiva, each loan request includes both traditional demographic information, su
 
 Despite her uplifting story, and her previous successful loan, Evelyn defaulted on her next loan of 900 USD. Could this default have been predicted and avoided? 
 
-Kiva's data science team is especially curious if the personal stories hold any predictive value. Text Analytics provides ways to understand and organize text data. Can Kiva's data science team use Text Analytics --- ways to understand and organize text data --- to leverage the personal stories to build a prediction system for loan applications, thereby reducing risk for lenders and Kiva?
+Kiva's data science team is especially curious if the personal stories hold any predictive value. Text Analytics provides ways to understand and organize text data. Can Kiva's data science team use Text Analytics to leverage the personal stories to build a prediction system for loan applications, thereby reducing risk for lenders and Kiva?
 
 
 # Kiva's Data
@@ -60,50 +61,78 @@ however, refrain from displaying their public information and are referred to as
 
 - **Partner.** A partner, or Kiva field partner, is usually a microfinance institution with which Kiva works to find and fund loans. Every loan at Kiva is offered by a partner to a borrower, and the partner works with Kiva to get funding for that loan from lenders.
 
-Kiva provides public snapshots of all loan data on their website [http://build.kiva.org](http://build.kiva.org/). The data includes the following variables:
 
-
-Variable    Description  
---------    -------------- 
-id          A unique identifier for the loan.
-sector      Industry sector of borrower.
-country     Borrower's country of residence.
-gender      Borrower's gender.
-loan_amount Amount of the loan, in USD.
-non_payment Who is liable if the loan defaults: the lender, or the partner?
-en          Borrower's personal story.
-status      Whether borrower defaulted or repaid loan.
----------   --------------
+```{r}
+tmpdf = data.frame(Variable=c("id", "sector", "country", "gender", "loan_amount", "non_payment", "story", "status"),
+                   Description=c("A unique identifier for the loan.",
+                                 "Industry sector of borrower.",
+                                 "Borrower's country of residence.",
+                                 "Borrower's gender.",
+                                 "Amount of the loan, in USD.",
+                                 "Who is liable if the loan defaults: the lender, or the partner?",
+                                 "Borrower's personal story.",
+                                 "Whether borrower defaulted or repaid loan."
+                                 ))
+kable(tmpdf, "latex", booktab=TRUE) %>%  
+  kable_styling(font_size = 10, full_width=TRUE, latex_options = c("striped", "scale_down"))
+```
 
 Kiva's data science team decides to use a snapshot that contains about 8,000 completed loans, of which about 4,000 were repaid and 4,000 were defaulted. Exhibit 1 contains a descriptive summary of each variable.
 
 
 # Beyond Numbers: Adding Text Variables
 
-The overall goal of the data science team is to reduce risk to potential lenders, and to make sure loan resources are spent on borrowers with the highest likelihood of repaying. The team decides to build a prediction model (i.e., a _classifier_) that uses as much of the available historical data as possible in order to build an accurate model of which borrowers will repay, and which will default.
+The overall goal of the data science team is to reduce the risk to potential lenders, and to make sure loan resources are spent on borrowers with the highest likelihood of repaying. The team decides to build a prediction model (i.e., a _classifier_) that uses the available historical data -- numerical, categorical, and textual data -- in order to build an accurate model of which borrowers will repay, and which will default.
 
-Most classifiers are able to accept numerical data (e.g., loan amount) and categorical data (e.g., gender, country) as inputs, but are not able to accept raw text data (e.g., en). Thus, the data science team must wrangle the text data to make it suitable for the classifier.
+Most classifiers are able to accept numerical and categorical data as inputs, but are not able to accept raw text data. As an example, consider the following data, in which the `loan_purpose` variable contains raw text data and thus cannot be input to classifiers.
 
-TODO: there are many ways to do this: individual words, key phrases, topics, etc. This team uses topics.
+```{r}
+tmpdf = data.frame(id=c(1, 2, 3, 4, "..."), 
+                   age=c(34, 56, 23, 29, ""), 
+                   country=c("Panama", "Mexico", "Uganda", "Kenya", ""),
+                   loan_purpose=c("I'd like to purchase a new farm tractor for my farm.", 
+                                 "Hire additional day labourors to tend to my expanding avocado farm.", 
+                                 "My child sitting service is expanding and I really need to renovate my home.",
+                                 "To purchase 20 more cows for my dairy farm.", ""))
 
-The first thing the data science team does is split the text into invidual words. For example, the sentence "She has dairy cows" will be split into four words: "She", "has", "dairy", and "cows".
+kable(tmpdf, "latex", booktab=TRUE) %>%  
+  kable_styling(font_size = 10, full_width=TRUE, latex_options = c("striped", "scale_down"))
+```
 
-The team then removes noise. This include fixing mispelled words, removing overly common words, and removing very rare words.
+There are several text analytics techniques to turn a text document into numerical data. One common technique is to simply split each document into individual words, and count how many times each word appears in each document. Doing so to the example data above would result in the following data:
 
-The then team inputs the cleaned words into an advanced topic model, called Latent Dirichlet Allocation (LDA) to automatically extract high-level topics from the text. For example, one personal story might contain the topics "dairy, cow, milk" and "wheat, farm, field", while another personal story might include the topics "clothing, garmet, shirt" and "children, child, kid." LDA will tell us which topics are in which personal stories. Note that the LDA automatically creates the topics from scratch, based on the input text; it does not have a list of common topics from which it chooses. As a result, the topics are specific to the text data in the given dataset. The extracted topics are show in Exhibit 2. Below is a sample of the data that will be used to train the classifiers:
 
-TODO: a few sample rows.
+```{r}
+tmpdf = data.frame(id=c(1, 2, 3, 4, "..."), 
+                   age=c(34, 56, 23, 29, ""), 
+                   country=c("Panama", "Mexico", "Uganda", "Kenya", ""),
+                   farm=c(2, 1, 0, 1, ""),
+                   purchase=c(1, 0, 0, 1, ""),
+                   expanding=c(0, 1, 1, 0, ""),
+                   cows=c(0,0,0,1, ""),
+                   hire=c(0 ,1, 0, 0, ""),
+                   tractor=c(1, 0, 0, 0, ""),
+                   "..."=c("...","...","...","...", "")
+)
+
+kable(tmpdf, "latex", booktab=TRUE) %>%  
+  kable_styling(font_size = 10, full_width=TRUE, latex_options = c("striped", "scale_down")) 
+```
+
+Each unique word from the raw text data now becomes a variable, and the value of each variable is the number of times that word appeared in the original document.  In this way, the data is now numerical, and thus it can be input to classifiers.
+
+Another common technique is to use two- or three-word phrases, instead of individual words. The idea is the same: the phrases now become variables in the dataset. 
+
+A recent text analytics advancement is to use a _topic model_ to extract the topics, or themes, from each document. In particular, a common topic model is called Latent Dirichlet Allocation (LDA). LDA can automatically extract high-level topics from text documents. For example, LDA might determine that one document contains the topics "dairy, cow, milk" and "wheat, farm, field", while another document contains the topics "clothing, garmet, shirt" and "children, child, kid." LDA will discover which topics are in which documents. Note that the LDA creates the topics from scratch, based on the input text; it does not have a list of predefined topics from which it chooses. As a result, the topics are specific to the text data in the given dataset.
+
+The data science team uses the LDA topic model to extract topics from each document. Exhibit X shows a few sample rows in the final dataset.
 
 
 # Building the Classifiers
 
-TODO
+Armed with the numeric, categorical, and text (i.e., topics) variables, the data science team can now build a classifier to predict loan defaults. There are lots of classifier algorithms available, from simple logistic regression, to Naive Bayes, all the way to deep neural networks. For this task, the team decides to use a decision tree algorithm, because of its speed, accuracy, and interpritability. 
 
-Armed with all the numeric, categorical, and text (i.e., topics) variables in the The data science teams has lots of different classifier algorithms available. For this task, the team decides to use a decision tree classifier, because of its speed, accuracy, and interpritability. 
-
-The team builds two decision tree classifiers. One is trained only on the numerical and categorical variables. The other is trained on the numerical, categorical, and text (i.e., topics) variables. This will help the team to determine if adding text to the classifiers is a good idea. Exhibit 3 shows the two classifiers and their performance.
-
-
+The team builds two decision tree classifiers. One is trained only on the numerical and categorical variables. The other is trained on the numerical, categorical, and textual (i.e., topics) variables. This will allow the team to determine whether adding text to the classifiers is beneficial. Exhibit 3 shows the two classifiers and their performance.
 
 
 # Case Discussion Questions
@@ -120,7 +149,6 @@ The team builds two decision tree classifiers. One is trained only on the numeri
 
 
 
-
 <!--
 # Loading the Data
 -->
@@ -128,6 +156,8 @@ The team builds two decision tree classifiers. One is trained only on the numeri
 
 ```{r, include=FALSE}
 df <- read_csv("kiva.csv")
+df = df %>%
+  rename(story = en)
 ```
 
 
@@ -157,12 +187,12 @@ summary(df)
 ```{r, include=FALSE}
 # Remove HTML Tags
 df = df %>% 
-  mutate(en = gsub("<.*?>", "", en))
+  mutate(story = gsub("<.*?>", "", story))
 
 # Convert into tidytext format
 text_df <- df %>%
-  select(id, status, en) %>%
-  unnest_tokens(word, en)
+  select(id, status, story) %>%
+  unnest_tokens(word, story)
 
 ## Remove stopwords
 custom_stop_words = data.frame(word=c("loan", "business"))
@@ -174,7 +204,7 @@ text_df <- text_df %>%
 # Stem words
 #library(SnowballC)
 #df = df %>% 
-#  mutate(en = wordStem(en))
+#  mutate(story = wordStem(story))
 ```
 
 
@@ -272,10 +302,10 @@ library(dplyr)
 library(knitr)
 sample = df %>%
   slice(c(1, 5000, 6009, 444, 7322)) %>%
-  select(-en, everything()) %>%
+  select(-story, everything()) %>%
   select(-id) %>%
-  mutate(en = gsub("\\\r", " ", en)) %>% 
-  mutate(en = gsub("\\\n", "", en))
+  mutate(story = gsub("\\\r", " ", story)) %>% 
+  mutate(story = gsub("\\\n", "", story))
 
 
 library(kableExtra)
@@ -470,9 +500,9 @@ addmargins(table(df$loan_amount.cut, df$status, dnn=c("loan_amount.cut", "status
 
 <P style="page-break-before: always">
 \newpage
-## Variable: en
+## Variable: story
 
-The `en` variable is raw English text, and there's lots of ways to look at it.
+The `story` variable is raw English text, and there's lots of ways to look at it.
 
 ### Length
 
@@ -480,10 +510,10 @@ The figure below is a density plot of the length (number of characters/letters).
 
 ```{r fig.height=2.5}
 df %>%
-  mutate(en_length = nchar(en)) %>%
+  mutate(en_length = nchar(story)) %>%
   ggplot(aes(en_length, colour=status, fill=status)) +
   geom_density(alpha=0.1) +
-  labs(x = "Number of characters in `en`")
+  labs(x = "Number of characters in `story`")
 ```
 
 ### Top Words
@@ -634,7 +664,7 @@ The figure below shows the number of documents that contain each topic (i.e., mo
 ```{r}
 topic_totals = lda_gamma %>%
   left_join(df, by=c("document" = "id")) %>%
-  select(c(-en)) %>% 
+  select(c(-story)) %>% 
   filter(gamma >= 0.05) %>%
   group_by(topic, status) %>% 
   summarize(count=n()) %>%
@@ -665,7 +695,7 @@ kable(topic_totals, "latex", booktab=TRUE) %>%
 
 ### LDA Examples
 
-Below is an example of an application whose `en` variable contained LDA topic 8 at 99%. 
+Below is an example of an application whose `story` variable contained LDA topic 8 at 99%. 
 
 *Senaida Agueda has a business in which she buys and resells clothing that she has been operating for about 2 years now with the help of loans from Esperanza. She has two children, 41 and 38, whom do not live with Mrs. Agueda. When not working with her clothing shop, she enjoys going to the beach and cooking, arroz con carne (rice with meat) being one of her favorite dishes. As Mrs. Agueda is in her elder years and has fully grown children, she simply wishes to sustain her business to support her and her husband. Mrs. Senaida Agueda is a member of an eight person group, Group 4, that is part of a larger micro-bank called Mujeres de Fe, "Women of Faith" in English. In the picture, Mrs. Agueda is third from the right along with members of her group and some others of Mujeres de Fe. Her story is just one of a list of men and women who are improving their quality of life through the help of micro-credit loans of Esperanza. Together, this group has united with a common vision of a better life with faith and hope in their hearts and an unbreakable spirit. The concept of group lending is to have loans paid in a group to reduce the risk of a person defaulting, as others pick up where a person may lag to receive the next loan. Each of the associates in this bank has a similar business whether it is a motor taxi service or selling cosmetics. Thank you for your support and awareness of this issue, and it is your concern and efforts that is able to bring a difference to the lives of people such as Mrs. Agueda.*
 
@@ -685,7 +715,7 @@ ids = lda_gamma %>%
   arrange(desc(gamma)) %>%
   top_n(1000) %>%
   left_join(df_new, by=c("document" = "id")) %>%
-  mutate(len = nchar(en)) %>%
+  mutate(len = nchar(story)) %>%
   arrange(len)
 ids
 ids = c(7830, 7306, 7258, 7105)
@@ -768,7 +798,7 @@ print(sprintf("Specificity: %.3f", Specificity(y_true=predicted, y_pred=actual))
 set.seed(123)
 # Don't want to use either of these for prediction, and the - sign doesn't work
 # with rpart forumulas.
-df_text = subset(df_new, select=c(-id, -en))
+df_text = subset(df_new, select=c(-id, -story))
 
 # Split the data into training and testing.
 train_text <- sample_frac(df_text, 0.8)
