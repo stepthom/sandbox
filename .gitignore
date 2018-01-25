@@ -4,4 +4,5 @@ out
 .ipynb_checkpoints/
 arules.nb.html
 *.html
-kiva.docx
+kiva*.docx
+kiva*.pdf

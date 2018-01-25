@@ -3,6 +3,7 @@ title: 'Using Text Analytics to Predict Loan Default'
 subtitle: "A case study of Kiva"
 author: "Dr. Stephen W. Thomas, Smith School of Business, Queen's University"
 date: "January 2018"
+documentclass: article
 output:
   pdf_document:
     highlight: pygments
@@ -14,13 +15,13 @@ output:
     toc_depth: '2'
 ---
 
-
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = FALSE, warning=FALSE, message=FALSE, fig.align='center')
 ```
 
 ```{r}
 library(tidyverse)
+library(ggthemes)
 library(scales)
 library(rpart)
 library(rpart.plot)
@@ -33,7 +34,9 @@ library(kableExtra)
 ```
 
 
-[Kiva Microfunds](https://www.kiva.org/) is a non-profit that allows people to lend money to low-income entrepreneurs and students around the world. Since starting in 2005, Kiva has crowd-funded millions of loans with a repayment rate of 98% to 99%.
+Kiva Microfunds[^1]  is a non-profit that allows people to lend money to low-income entrepreneurs and students around the world. Since starting in 2005, Kiva has crowd-funded millions of loans with a repayment rate of 98% to 99%.
+
+[^1]: https://www.kiva.org/
 
 At Kiva, each loan request includes both traditional demographic information, such as gender and location, as well as personal stories on each borrower because Kiva wants lenders to connect with the borrowers on a human level. An example of a personal story:
 
@@ -296,32 +299,63 @@ setnames(df_new, old=sprintf("%d", c(1:12)), new=sprintf("topic %d: %s", c(1:12)
 
 # Exhibit 1
 
+Below are descriptive plots for the variables in the dataset.
 
-```{r fig.height=2, fig.width=2}
-qplot(status, data=df, geom="bar", fill=status, xlab="status") + theme(legend.position = "none")
+\vspace{20pt}
 
-qplot(country, data=df, geom="bar", fill=status)  + theme(legend.position = "none")
+```{r fig.height=2, fig.width=2, out.width='.49\\linewidth', fig.show='hold',fig.align='center'}
 
-qplot(sector, data=df, geom="bar", fill=status, xlab="sector") +
-  theme(axis.text.x = element_text(angle = 45, hjust = 1)) + theme(legend.position = "none")
+#myt = theme_igray()
+myt = theme_economist()
+#myt = theme_fivethirtyeight()
+qplot(status, data=df, geom="bar", fill=status, xlab="status") + myt +
+  theme(legend.position = "none") 
 
-qplot(gender, data=df, geom="bar", fill=status) + theme(legend.position = "none")
+qplot(gender, data=df, geom="bar", fill=status) + myt +
+  theme(legend.position = "none")
 
-qplot(nonpayment, data=df, geom="bar", fill=status) + theme(legend.position = "none")
-
-df %>% 
-  ggplot(aes(loan_amount, colour=status, fill=status)) +
-  geom_density(alpha=0.1) +
+qplot(nonpayment, data=df, geom="bar", fill=status) + myt +
   theme(legend.position = "none")
 ```
 
-```{r fig.height=2.5}
+\vspace{20pt}
+
+
+
+```{r fig.height=2.8, fig.width=3, out.width='.49\\linewidth', fig.show='hold',fig.align='center'}
+
+tmpdf = df
+tmpdf$country = gsub("Dominican Republic", "D.R.", tmpdf$country)
+
+qplot(country, data=tmpdf, geom="bar", fill=status) + myt +
+  theme(legend.position = "none")
+
+qplot(sector, data=df, geom="bar", fill=status, xlab="sector") + myt +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1, vjust=1)) + theme(legend.position = "none")
+
+rm(tmpdf)
+```
+
+\vspace{20pt}
+
+
+```{r fig.width=4, fig.height=2.5, out.width='.49\\linewidth', fig.show='hold',fig.align='center'}
+df %>% 
+  ggplot(aes(loan_amount, colour=status, fill=status)) + myt +
+  geom_density(alpha=0.1) +
+  theme(legend.position = "none")
+
 df %>%
   mutate(en_length = nchar(story)) %>%
-  ggplot(aes(en_length, colour=status, fill=status)) +
+  ggplot(aes(en_length, colour=status, fill=status)) + myt +
   geom_density(alpha=0.1) +
+  theme(legend.position = "none") +
   labs(x = "Number of letters in `story`")
 ```
+
+
+<P style="page-break-before: always">
+\newpage
 
 ### Top Words
 
@@ -332,7 +366,7 @@ kable(text_df %>% group_by(word) %>%
   summarize(count=n()) %>%
   mutate(freq = count / sum(count)) %>%
   arrange(desc(count)) %>%
-  top_n(20), "latex", booktab=TRUE) %>%
+  top_n(18), "latex", booktab=TRUE) %>%
   kable_styling(full_width=TRUE, latex_options = c("striped", "scale_down"))
 ```
 
@@ -355,11 +389,11 @@ log_ratios = status_words_count %>%
   mutate(log_ratio = log2(paid/defaulted)) 
 ```
 
-```{r, fig.height=4}
+```{r, fig.height=3.5}
 log_ratios %>%
   filter(total > 500) %>%
   group_by(log_ratio < 0) %>%
-  top_n(15, abs(log_ratio)) %>%
+  top_n(14, abs(log_ratio)) %>%
   ungroup() %>%
   mutate(word = reorder(word, log_ratio)) %>%
   ggplot(aes(word, log_ratio, fill = log_ratio < 0)) +
@@ -394,12 +428,13 @@ kable(log_ratios %>%
 
 # Exhibit 2: LDA Topics
 
+Latent Dirichlet Allocation (LDA) was applied to the `story` variable using the R package `topicmodels`. The Kiva team told LDA to find twelve topics.
 
 ### LDA Top Terms Per Topic
 
-This figure shows the top terms (words) in each of the 12 discovered topic.
+This figure shows the top terms (words) in each of the twelve discovered topics. Each topic is assigned a name of the form "Topic Number: TopWord1_TopWord2_TopWord3_TopWord4."
 
-```{r,fig.width=10,fig.height=8}
+```{r,fig.width=10,fig.height=8.0}
 ap_top_terms <- lda_beta %>%
   group_by(topic) %>%
   top_n(10, beta) %>%
@@ -421,7 +456,7 @@ ap_top_terms %>%
 
 ### Documents per LDA Topic
 
-The figure below shows the number of documents that contain each topic (i.e., more than 5%), coloured by `status`.
+The figure below shows the number of documents that contain each topic.
 
 ```{r}
 topic_totals = lda_gamma %>%
@@ -436,30 +471,28 @@ topic_totals = lda_gamma %>%
   select(topic, topic_name, everything())
 ```
 
-```{r fig.height=5}
+```{r fig.height=3}
 tmp_gathered = topic_totals %>% 
   select(topic, topic_name, defaulted, paid) %>% 
   gather(Status, Value, defaulted, paid)
 
-ggplot(tmp_gathered, aes(x=topic_name, y=Value, fill=Status)) + 
-  geom_bar(stat="identity") +  
-  theme(axis.text.x = element_text(angle = 65, hjust = 1)) 
+tmp_gathered$topic = as.factor(tmp_gathered$topic)
+ggplot(tmp_gathered, aes(x=topic, y=Value, fill=Status)) + myt +
+  geom_bar(stat="identity")
 ```
 
-```{r}
+
+```{r, include=FALSE}
 kable(topic_totals, "latex", booktab=TRUE) %>%
   kable_styling(full_width=TRUE, latex_options = c("striped", "scale_down"))
 ```
 
 
-<P style="page-break-before: always">
-\newpage
-
 ### LDA Examples
 
-Below is an example of an application whose `story` variable contained LDA topic 8 at 99%. 
+Below is an example of a `story` variable contained LDA topic 8 at 99%. 
 
-*Senaida Agueda has a business in which she buys and resells clothing that she has been operating for about 2 years now with the help of loans from Esperanza. She has two children, 41 and 38, whom do not live with Mrs. Agueda. When not working with her clothing shop, she enjoys going to the beach and cooking, arroz con carne (rice with meat) being one of her favorite dishes. As Mrs. Agueda is in her elder years and has fully grown children, she simply wishes to sustain her business to support her and her husband. Mrs. Senaida Agueda is a member of an eight person group, Group 4, that is part of a larger micro-bank called Mujeres de Fe, "Women of Faith" in English. In the picture, Mrs. Agueda is third from the right along with members of her group and some others of Mujeres de Fe. Her story is just one of a list of men and women who are improving their quality of life through the help of micro-credit loans of Esperanza. Together, this group has united with a common vision of a better life with faith and hope in their hearts and an unbreakable spirit. The concept of group lending is to have loans paid in a group to reduce the risk of a person defaulting, as others pick up where a person may lag to receive the next loan. Each of the associates in this bank has a similar business whether it is a motor taxi service or selling cosmetics. Thank you for your support and awareness of this issue, and it is your concern and efforts that is able to bring a difference to the lives of people such as Mrs. Agueda.*
+*Senaida Agueda has a business in which she buys and resells clothing that she has been operating for about 2 years now with the help of loans from Esperanza. She has two children, 41 and 38, whom do not live with Mrs. Agueda. When not working with her clothing shop, she enjoys going to the beach and cooking, arroz con carne (rice with meat) being one of her favorite dishes. As Mrs. Agueda is in her elder years and has fully grown children, she simply wishes to sustain her business to support her and her husband. Mrs. Senaida Agueda is a member of an eight person group, Group 4, that is part of a larger micro-bank called Mujeres de Fe, "Women of Faith" in English. In the picture, Mrs. Agueda is third from the right along with members of her group and some others of Mujeres de Fe. (...)*
 
 Below is an example for LDA topic 4: 
 
@@ -494,14 +527,16 @@ kable(t(df_new[ids[1],]), "latex", booktab=TRUE)  %>%
 <P style="page-break-before: always">
 \newpage
 
-# Exhibit 3
+# Exhibit 3: A Sample of Data
 
-A few sample rows of the final dataset.
+A few random rows of the final dataset. The columns named "T1", "T2", etc., are the percentage of the original story's words that have been assigned to topic 1, topic 2, etc., as determined by the LDA topic model. 
+
+\vspace{20pt}
 
 ```{r}
 ids = c(1, 560, 709, 1111, 1278, 2345, 3984, 4000, 5000, 6000, 7000, 7566)
 set.seed(124)
-ids = floor(runif(20, min = 1, max = nrow(df_new)))
+ids = floor(runif(60, min = 1, max = nrow(df_new)))
 
 aa = df_new[ids,] %>%
   select(-story, -id)
@@ -521,9 +556,11 @@ kable(aa, "latex", booktab=TRUE, digits=2) %>%
 
 # Exhibit 4: Model Perfomance
 
+Decision tree models were created with the R package `rpart`.
+
 ## Model 1 (No text)
 
-Below is the decision tree model that was learned from the training data, excluding the text (i.e., topic variables).
+Below is the model that was learned from the training data, excluding the text (i.e., topic variables).
 
 ```{r fig.height=2}
 set.seed(123)
@@ -565,9 +602,9 @@ kable(preds, "latex", booktab=TRUE) %>%
 ```
 
 
-## Model 2 (With the Text)
+## Model 2 (With Text)
 
-Below is the decision tree model that was learned from the training data, including all variables.
+Below is the model that was learned from the training data, including all variables.
 
 
 ```{r fig.height=2.5}
@@ -650,10 +687,8 @@ kable(bb, "latex", booktab=TRUE, digits=3) %>%
 
 # Appendix 1: Data Collection
 
-The data in this case study was collected from [http://build.kiva.org](http://build.kiva.org/), Kiva's website that provides snapshots of Kiva loan data. In the full dataset, about 98% of loans are paid and 2% defaulted. In this case study, we look at only a sample of the data, where the split between paid and defaulted is closer to 50%-50%. This sample is available at [http://www.github.com/stepthom/sandbox/data/kiva.csv](http://www.github.com/stepthom/sandbox/data/kiva.csv).
+The data in this case study was collected from Build.Kiva[^2], Kiva's website that provides snapshots of Kiva loan data. In the full dataset, about 98% of loans are paid and 2% defaulted. In this case study, we look at only a sample of the data, where the split between paid and defaulted is closer to 50%-50%. This sample is available at [http://www.github.com/stepthom/sandbox/data/kiva.csv](http://www.github.com/stepthom/sandbox/data/kiva.csv).
 
-# Appendix 2: Further Reading
+[^2]: https://build.kiva.org
 
-- [Kiva.org](https://www.kiva.org/). Kiva's homepage.
-- [Build.Kiva](http://build.kiva.org/). Kiva data dumps and data description.
  

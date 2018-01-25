@@ -1,7 +1,8 @@
 ---
-title: 'Document Classification Case Study: Kiva Loans'
-author: "Dr. Stephen W. Thomas, Queen's University"
-date: "July 14, 2017"
+title: 'Using Text Analytics to Predict Loan Default'
+subtitle: "A case study of Kiva"
+author: "Dr. Stephen W. Thomas, Smith School of Business, Queen's University"
+date: "January 2018"
 output:
   pdf_document:
     highlight: pygments
@@ -13,12 +14,13 @@ output:
     toc_depth: '2'
 ---
 
+# Teaching Note
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = FALSE, warning=FALSE, message=FALSE, fig.align='center')
 ```
 
-# Intro
+## Intro Questions
 
 - Who has used Kiva? 
 - Why did you choose Kiva? 
@@ -27,24 +29,23 @@ knitr::opts_chunk$set(echo = FALSE, warning=FALSE, message=FALSE, fig.align='cen
 - Did you continue to lend to Kiva, and why or why not?
 
 
-# Case Discussion Questions
+## Case Discussion Questions
 
-Please be prepared to discuss the following questions.
+_1. What is Kiva's value proposition?_
 
-1. What is Kiva's value proposition?
-
-
-
-2. What is the primary innovation that Kiva brought to its industry?
+Kiva provides a connection between loan seekers with lenders.
 
 
+_2. What is the primary innovation that Kiva brought to its industry?_
 
-3. How does Kiva make money?
+Making it easy and simple for common individuals to provide funds to deserving individuals.
+
+_3. How does Kiva make money?_
 
 Kiva doesn't. They're a not-for-profit. They cover their own costs by donations, grants, etc.
 
 
-4. What factors might go into a lender's decision to lend money to a borrower?
+_4. What factors might go into a lender's decision to lend money to a borrower?_
 
 - Loan amount
 - Country
@@ -54,19 +55,19 @@ Kiva doesn't. They're a not-for-profit. They cover their own costs by donations,
 - Feeling good about life in general
 
 
-5. How does text data affect a prediction model's ability to predict a default? 
+_5. How does text data affect a prediction model's ability to predict a default?_
 
 It increases the accuracy and all the other metrics.
 
 
-6. Which words/phrases are most biased towards defaulting? Is this expected/intuitive?
+_6. Which words/phrases are most biased towards defaulting? Is this expected/intuitive?_
 
 Biased towards payment: microfinance, mifex.org, esperanza.
 
 Biased towards non-payment: cow, dairy, cows, mary, church, maize, intends, repay
 
 
-7. According to the decision tree models, which variables best predict a default?
+_7. According to the decision tree models, which variables best predict a default?_
 
 - `nonpayment`. If "parnter", then the loan very likely to be paid.
 - `Topic 8`. If present, then more likely to be paid. Topic is "children, esperanza, support, women".- 
@@ -74,7 +75,7 @@ Biased towards non-payment: cow, dairy, cows, mary, church, maize, intends, repa
 - `country`. Kenya is most likely to default.
 - `loan_amount`. Large loan are more likely to be paid.
 
-8. What additional information might lead to a better predictive model?
+_8. What additional information might lead to a better predictive model?_
 
 Ideas from previous classes:
 - Loan history
@@ -84,7 +85,7 @@ Ideas from previous classes:
 - extract number of children from text.
 
 
-9. How would you operationalize the prediction model at Kiva? What technical challenges and risks do you envision? What procedural challenges and risks do you envision?
+_9. How would you operationalize the prediction model at Kiva? What technical challenges and risks do you envision? What procedural challenges and risks do you envision?_
 
 One way to deploy the model is to publish the prediction next to each loan request.
 
