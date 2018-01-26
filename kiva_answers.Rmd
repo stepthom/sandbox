@@ -3,12 +3,16 @@ title: 'Using Text Analytics to Predict Loan Default'
 subtitle: "A case study of Kiva"
 author: "Dr. Stephen W. Thomas, Smith School of Business, Queen's University"
 date: "January 2018"
+
+documentclass: article
 output:
   pdf_document:
     highlight: pygments
     number_sections: yes
     toc: no
     toc_depth: '2'
+    latex_engine: xelatex
+
   word_document:
     toc: no
     toc_depth: '2'
@@ -17,6 +21,9 @@ output:
 # Teaching Note
 
 ```{r setup, include=FALSE}
+library(tidyverse)
+library(knitr)
+library(kableExtra)
 knitr::opts_chunk$set(echo = FALSE, warning=FALSE, message=FALSE, fig.align='center')
 ```
 
@@ -36,16 +43,10 @@ _1. What is Kiva's value proposition?_
 Kiva provides a connection between loan seekers with lenders.
 
 
-_2. What is the primary innovation that Kiva brought to its industry?_
-
-Making it easy and simple for common individuals to provide funds to deserving individuals.
-
-_3. How does Kiva make money?_
-
-Kiva doesn't. They're a not-for-profit. They cover their own costs by donations, grants, etc.
-
 
 _4. What factors might go into a lender's decision to lend money to a borrower?_
+
+Answers will vary. Here is a previous class's answer:
 
 - Loan amount
 - Country
@@ -60,20 +61,26 @@ _5. How does text data affect a prediction model's ability to predict a default?
 It increases the accuracy and all the other metrics.
 
 
-_6. Which words/phrases are most biased towards defaulting? Is this expected/intuitive?_
-
-Biased towards payment: microfinance, mifex.org, esperanza.
-
-Biased towards non-payment: cow, dairy, cows, mary, church, maize, intends, repay
-
-
 _7. According to the decision tree models, which variables best predict a default?_
 
-- `nonpayment`. If "parnter", then the loan very likely to be paid.
+- `nonpayment`. If "partner", then the loan very likely to be paid.
 - `Topic 8`. If present, then more likely to be paid. Topic is "children, esperanza, support, women".- 
 - `Topic 12`. If present, then more likely to be paid. Topic is "rice, farmers, baba, sector."
 - `country`. Kenya is most likely to default.
 - `loan_amount`. Large loan are more likely to be paid.
+
+_7. What other text analytics/NLP techniques might be applied to the dataset to improve the prediction model?_
+
+- More cleaning: stemming, fixing mispelling
+- Translating all to English
+- Using n-grams/phrases
+- Using word2vec representations
+- Extracting some structured data: 
+  - How many kids
+  - The name
+  - Whether they have a job
+  - The name of the field partner
+  - Age
 
 _8. What additional information might lead to a better predictive model?_
 
@@ -83,9 +90,10 @@ Ideas from previous classes:
 - translating all to english
 - extracting age from text
 - extract number of children from text.
+- More data
 
 
-_9. How would you operationalize the prediction model at Kiva? What technical challenges and risks do you envision? What procedural challenges and risks do you envision?_
+_9. How should Kiva operationalize the prediction model? What technical challenges and risks do you envision? What procedural challenges and risks do you envision?_
 
 One way to deploy the model is to publish the prediction next to each loan request.
 
