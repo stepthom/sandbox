@@ -34,17 +34,17 @@ library(kableExtra)
 ```
 
 
-Kiva Microfunds[^1]  is a non-profit that allows people to lend money to low-income entrepreneurs and students around the world. Since starting in 2005, Kiva has crowd-funded millions of loans with a repayment rate of 98% to 99%.
+Kiva Microfunds[^1]  is a non-profit that allows individuals to lend money to low-income entrepreneurs and students around the world. Since starting in 2005, Kiva has crowd-funded millions of loans with a repayment rate of around 98%.
 
 [^1]: https://www.kiva.org/
 
-At Kiva, each loan request includes both traditional demographic information, such as gender and location, as well as personal stories on each borrower because Kiva wants lenders to connect with the borrowers on a human level. An example of a personal story:
+At Kiva, each loan request includes both traditional demographic information, such as gender and location, as well as a personal story, because Kiva wants lenders to connect with the borrowers on a human level. An example of a personal story:
 
 *Evelyn is 40 years old and married with 3 kids. She is in the Karura Hope women group and her life has been changed by the first KIVA loan she received last year which she is completing this quarter. Before she received the loan, she used to sell 9 litres of milk daily to local residents. After receiving the loan she bought iron sheets, five cement packets, one lorry of sand, some ballast and animal feed for her cows and improved her cow shed. Today she sells a daily average of 40 litres of milk to the Kiamba Dairy cooperative society, which is affiliated to the Kenya Cooperative Creameries at a cost of USD 0.28 per litre. Her daily farming has really grown. Evelyn intends to buy another dairy cow and a tank of water for home consumption and for her cows. She intends to repay in monthly installments.*
 
-Despite her uplifting story, and her previous successful loan, Evelyn defaulted on her next loan of 900 USD. Could this default have been predicted and avoided? 
+Despite her uplifting story, and her previous successful loan, Evelyn defaulted on her next loan of 900 USD. Her lenders lost their money, and Evelyn is no longer allowed to use Kiva.
 
-Kiva's data science team is especially curious if the personal stories hold any predictive value. Text Analytics provides ways to understand and organize text data. Can Kiva's data science team use Text Analytics to leverage the personal stories to build a prediction system for loan applications, thereby reducing risk for lenders and Kiva?
+Kiva's data science team has been tasked to determine if this unfortunate default--- and other like it--- could have been predicted based on the data in the loan application? The data science team is especially curious if the personal story adds predictive value. Since the story is textual, not numerical, Kiva's data science team nees to use text analytics. Text analytics provides a suite of techniques to understand and organize text data, such as the personal stories on Kiva's loan applications. Can Kiva's data science team therefore use Text Analytics to leverage the personal stories to build a prediction system for loan applications, thereby reducing risk for lenders and Kiva?
 
 
 # Kiva's Data
