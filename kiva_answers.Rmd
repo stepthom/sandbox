@@ -43,7 +43,6 @@ _1. What is Kiva's value proposition?_
 Kiva provides a connection between loan seekers with lenders.
 
 
-
 _4. What factors might go into a lender's decision to lend money to a borrower?_
 
 Answers will vary. Here is a previous class's answer:

@@ -39,13 +39,13 @@ Kiva Microfunds[^1] is a non-profit that allows individuals to lend money to low
 
 [^1]: https://www.kiva.org/
 
-At Kiva, each loan request includes both traditional demographic information, such as gender and location, as well as a personal story, because Kiva wants lenders to connect with the borrowers on a human level. An example of a personal story:
+At Kiva, each loan request includes both traditional demographic information on the borrower, such as gender and location, as well as a personal story, because Kiva wants lenders to connect with  borrowers on a human level. An example of a personal story:
 
 *Evelyn is 40 years old and married with 3 kids. She is in the Karura Hope women group and her life has been changed by the first KIVA loan she received last year which she is completing this quarter. Before she received the loan, she used to sell 9 litres of milk daily to local residents. After receiving the loan she bought iron sheets, five cement packets, one lorry of sand, some ballast and animal feed for her cows and improved her cow shed. Today she sells a daily average of 40 litres of milk to the Kiamba Dairy cooperative society, which is affiliated to the Kenya Cooperative Creameries at a cost of USD 0.28 per litre. Her daily farming has really grown. Evelyn intends to buy another dairy cow and a tank of water for home consumption and for her cows. She intends to repay in monthly installments.*
 
 Despite her uplifting story, and her previous successful loan, Evelyn defaulted on her next loan of 900 USD. Her lenders lost their money, and Evelyn is no longer allowed to use Kiva.
 
-Kiva's data science team has been tasked to determine if this unfortunate default---and others like it---could have been predicted from the data in the loan application. If defaults can be predicted beforehand, then the risk to potential lenders is reduced, and loan resources are given to borrowers with the highest likelihood of repaying.
+Kiva's data science team has been tasked to determine if this unfortunate default---and all others like it---could have been predicted from the data in the loan application. If defaults can be predicted beforehand, then the risk to potential lenders is reduced, and loan resources are given to borrowers with the highest likelihood of repaying.
 
 To tackle this task, the data science team decides to use machine learning to build a prediction model based on historical loan data. The data science team is especially curious if the personal story itself will add any predictive power to the model. Since the personal stories are textual, as opposed to numerical, the data science team will need to use _text analytics_---techniques to understand, organize, and transform textual data into numerical data---to process the stories.  
 
@@ -55,9 +55,7 @@ Will text analytics help Kiva's data science team to build an effective predicti
 
 # Kiva's Data
 
-Luckily for the data science team, Kiva carefully maintains a history of all previous loan applications, including items like the borrower's demographic data, the requested loan amount, and whether the loan was repaid.
-
-Also worth noting is that all loan applications have an associated field partner, which is local  microfinance institution with which Kiva works to find and fund loans. Every loan at Kiva is offered by a partner to a borrower, and the partner works with Kiva to get funding for that loan from lenders.
+Luckily for the data science team, Kiva carefully maintains a history of all previous loan applications, including items like the borrower's demographic data, the industry sector of the borrower, the requested loan amount, and whether the loan was eventually repaid.
 
 Kiva's data science team extracts a snapshot of the historical loan data. The snapshot contains about 8,000 completed loans, of which about 50% were repaid and 50% were defaulted. Exhibit 1 shows the data dictionary and a few sample rows, and Exhibit 2 contains a descriptive summary of each of the eight variables in the dataset.
 
@@ -66,7 +64,7 @@ Kiva's data science team extracts a snapshot of the historical loan data. The sn
 
 Most machine learning algorithms that construct prediction models are able to accept numerical and categorical data as inputs, but are not able to accept raw text data. This means that the data science team can't use the `story` variable as-is. The team must first use various text analytics techniques to turn each story into numerical data. One common technique to do so is to split each story (also called a _document_ in the literature) into individual words, and count how many times each word appears in each document. Each individual word becomes its own variable in the dataset.
 
-As an example, consider the following dataset, in which the `loan_purpose` variable contains raw text data and thus cannot be input to machine learning algorithms
+As an example, consider the following dataset, in which the `loan_purpose` variable contains raw text data and thus cannot be input to machine learning algorithms.
 
 ```{r}
 tmpdf = data.frame(id=c(1, 2, 3, 4, "..."), 
@@ -74,11 +72,12 @@ tmpdf = data.frame(id=c(1, 2, 3, 4, "..."),
                    country=c("Panama", "Mexico", "Uganda", "Kenya", ""),
                    loan_purpose=c("I'd like to purchase a new farm tractor for my farm.", 
                                  "Hire additional day labourors to tend to my expanding avocado farm.", 
-                                 "My child sitting service is expanding and I really need to renovate my home.",
+                                 "My child care service is expanding and I really need to renovate my home.",
                                  "To purchase 20 more cows for my dairy farm.", ""))
 
 kable(tmpdf, "latex", booktab=TRUE) %>%  
-  kable_styling(font_size = 10, full_width=TRUE, latex_options = c("striped", "scale_down"))
+  kable_styling(font_size = 10, full_width=TRUE, latex_options = c("striped", "scale_down")) %>%
+  column_spec(4, width = "32em")
 ```
 
 Splitting each document as described above would result in the following dataset:
@@ -101,11 +100,11 @@ kable(tmpdf, "latex", booktab=TRUE) %>%
   kable_styling(font_size = 10, full_width=TRUE, latex_options = c("striped", "scale_down")) 
 ```
 
-Each unique word from the raw text data now becomes its own variable, and the value of each variable is the number of times that word appears in the original document. The original `loan_purpose` variable is removed. In this way, the remaining variables are all now numerical, and thus the dataset can be input into a machine learning algorithm.
+Each unique word from the raw text data now becomes its own variable, and the value of each variable is the number of times that word appears in the original document. For instance, the new `farm` variable contains a 2 in row 1, because the word "farm" occurs twice in the original `loan_purpose` variable in row 1. Then, after the original `loan_purpose` variable is removed, the remaining variables are all now numerical, and thus the dataset can be input into a machine learning algorithm.
 
 Another common text analytics technique is to use two- or three-word phrases, instead of individual words. The idea is the same: the phrases now become variables in the dataset. 
 
-A recent advancement in text analytics is to use a _topic model_ to extract the topics, or themes, from each document. In particular, the most common topic model is Latent Dirichlet Allocation (LDA). LDA can automatically extract high-level topics from text documents. For example, LDA might determine that one document contains the two topics, "dairy, cow, milk" and "wheat, farm, field", while another document contains two other topics, "clothing, garment, shirt" and "children, child, kid." LDA will discover which topics are in which documents. Note that the LDA creates the topics from scratch, based on the input text; it does not have a list of predefined topics from which it chooses. As a result, the topics are specific to the text data in the given dataset.
+A recent advancement in text analytics is to use a _topic model_ to extract the topics, as opposed to individual words or phrases, from each document . In particular, the most common topic model is Latent Dirichlet Allocation (LDA). LDA can automatically extract high-level topics from text documents. For example, LDA might determine that one document contains the topic, "dairy farming" , while another document contains two other topics, "clothing manufacturing" and "child care." LDA will discover which topics are in which documents. Note that the LDA creates the topics from scratch, based on the input documents; it does not have a list of predefined topics from which it chooses. As a result, the topics are specific to the text data in the given dataset.
 
 The data science team decides to use LDA to extract twelve overarching topics from the stories. The team removes the `story` variable, and adds twelve new variables (i.e., one for each topic) that specify the percentage of words in each story that come from each topic. Exhibit 3 shows the resulting topics, and Exhibit 4 shows a few sample rows in the final dataset that is ready to be input to the machine learning algorithms.
 
@@ -114,7 +113,7 @@ The data science team decides to use LDA to extract twelve overarching topics fr
 
 Armed with the final dataset, the data science team can now use machine learning algorithms to build a prediction model for loan defaults. There are lots of machine learning algorithms available, ranging from simple logistic regression, to Naive Bayes, all the way to deep neural networks. For this task, the team decides to use a decision tree algorithm, because of its speed, accuracy, and interpretability. 
 
-In order to determine whether the text (or, more precisely, the topics built from the text) has predictive power, the team builds two similar, but different, decision tree models. The first is built by giving the decision tree algorithm only the numerical and categorical variables from the original dataset, i.e., `sector`, `country`, `gender`, `loan_amount`, and  `non_payment`. The second model is built by giving the decision tree algorithm all of those variables plus the twelve topic variables. The team thus runs the algorithm twice, and recieves two models in return that they can compare. Exhibit 5 shows the two models and their performance characteristics.
+In order to determine whether the text (or, more precisely, the topics built from the text) has predictive power, the team builds two similar, but slightly different, decision tree models. The first is built by giving the decision tree algorithm only the numerical and categorical variables from the original dataset, i.e., `sector`, `country`, `gender`, `loan_amount`, and  `non_payment`. The second model is built by giving the decision tree algorithm all of those variables plus the twelve topic variables. The team thus runs the algorithm twice, and recieves two models in return that they can then compare. Exhibit 5 shows the two models and their performance characteristics.
 
 
 # Case Discussion Questions
@@ -276,7 +275,7 @@ setnames(df_new, old=sprintf("%d", c(1:12)), new=sprintf("topic %d: %s", c(1:12)
 
 # Exhibit 1: Data Dictionary
 
-The table below is a dictionary for the eight variables in the dataset.
+The table below describes the eight variables in the dataset.
 
 ```{r}
 tmpdf = data.frame(Variable=c("id", "sector", "country", "gender", "loan_amount", "non_payment", "story", "status"),
@@ -290,12 +289,10 @@ tmpdf = data.frame(Variable=c("id", "sector", "country", "gender", "loan_amount"
                                  "Whether borrower defaulted or repaid loan."
                                  ))
 kable(tmpdf, "latex", booktab=TRUE) %>%  
-  kable_styling(font_size = 10, full_width=TRUE, latex_options = c("striped", "scale_down")) %>% footnote(general = "Here is a general comments of the table. ",
-           number = c("Footnote 1; ", "Footnote 2; "),
-           alphabet = c("Footnote A; ", "Footnote B; "),
-           symbol = c("Footnote Symbol 1; ", "Footnote Symbol 2")
-           )
+  kable_styling(font_size = 10, full_width=TRUE, latex_options = c("striped", "scale_down")) %>%  
+  column_spec(2, width = "35em")
 ```
+^1^ Note that all loan applications have an associated field partner, which is local microfinance institution with which Kiva works to find and fund loans. Every loan at Kiva is offered by a partner to a borrower, and the partner works with Kiva to get funding for that loan from lenders.
 
 
 
@@ -329,7 +326,7 @@ kable(aa, "latex", booktab=TRUE, digits=2) %>%
 
 # Exhibit 2
 
-Below are descriptive plots for the variables in the dataset.
+Below are descriptive plots for the numerical and categorical variables in the dataset.
 
 \vspace{20pt}
 
@@ -466,7 +463,7 @@ Latent Dirichlet Allocation (LDA) was applied to the `story` variable using the 
 
 ### LDA Top Terms Per Topic
 
-The figure below shows the top words related to each of the twelve discovered topics. Each topic is assigned a name of the form "Topic Number: TopWord1_TopWord2_TopWord3_TopWord4."
+The figure below shows the top words related to each of the twelve discovered topics. LDA itself does not assign a human-readable name to each topic. The topics are only defined by their word probabilities. However, to make the topics easier to quickly understand, Kiva's data science team has given a name to each topic using their four highest-probable words, of the form "Topic Number: TopWord1_TopWord2_TopWord3_TopWord4."
 
 ```{r,fig.width=10,fig.height=8.0}
 ap_top_terms <- lda_beta %>%
@@ -578,6 +575,9 @@ aa = df_new[sample_ids, ] %>%
 # Just to make the table look better
 aa$country = gsub("Dominican Republic", "D.R.", aa$country)
 setnames(aa, new=sprintf("T%d", c(1:12)), old=sprintf("topic %d: %s", c(1:12), topic_names))
+
+#TODO: set NAs to 0
+aa[is.na(aa)] <- 0
 
 kable(aa, "latex", booktab=TRUE, digits=2) %>%
   kable_styling(latex_options = c("striped", "scale_down"))
