@@ -39,9 +39,9 @@ Kiva Microfunds[^1] is a non-profit that allows individuals to lend money to low
 
 [^1]: https://www.kiva.org/
 
-At Kiva, each loan request includes both traditional demographic information on the borrower, such as gender and location, as well as a personal story, because Kiva wants lenders to connect with  borrowers on a human level. An example of a personal story:
+At Kiva, each loan request includes both traditional demographic information on the borrower, such as gender and location, as well as a personal story, because Kiva wants lenders to connect with  borrowers on a human level. For example, consider the personal story for a borrower named Evelyn:
 
-*Evelyn is 40 years old and married with 3 kids. She is in the Karura Hope women group and her life has been changed by the first KIVA loan she received last year which she is completing this quarter. Before she received the loan, she used to sell 9 litres of milk daily to local residents. After receiving the loan she bought iron sheets, five cement packets, one lorry of sand, some ballast and animal feed for her cows and improved her cow shed. Today she sells a daily average of 40 litres of milk to the Kiamba Dairy cooperative society, which is affiliated to the Kenya Cooperative Creameries at a cost of USD 0.28 per litre. Her daily farming has really grown. Evelyn intends to buy another dairy cow and a tank of water for home consumption and for her cows. She intends to repay in monthly installments.*
+> *Evelyn is 40 years old and married with 3 kids. She is in the Karura Hope women group and her life has been changed by the first KIVA loan she received last year which she is completing this quarter. Before she received the loan, she used to sell 9 litres of milk daily to local residents. After receiving the loan she bought iron sheets, five cement packets, one lorry of sand, some ballast and animal feed for her cows and improved her cow shed. Today she sells a daily average of 40 litres of milk to the Kiamba Dairy cooperative society, which is affiliated to the Kenya Cooperative Creameries at a cost of USD 0.28 per litre. Her daily farming has really grown. Evelyn intends to buy another dairy cow and a tank of water for home consumption and for her cows. She intends to repay in monthly installments.*
 
 Despite her uplifting story, and her previous successful loan, Evelyn defaulted on her next loan of 900 USD. Her lenders lost their money, and Evelyn is no longer allowed to use Kiva.
 
@@ -100,20 +100,20 @@ kable(tmpdf, "latex", booktab=TRUE) %>%
   kable_styling(font_size = 10, full_width=TRUE, latex_options = c("striped", "scale_down")) 
 ```
 
-Each unique word from the raw text data now becomes its own variable, and the value of each variable is the number of times that word appears in the original document. For instance, the new `farm` variable contains a 2 in row 1, because the word "farm" occurs twice in the original `loan_purpose` variable in row 1. Then, after the original `loan_purpose` variable is removed, the remaining variables are all now numerical, and thus the dataset can be input into a machine learning algorithm.
+Each unique word from the raw text documents now becomes its own variable, and the value of each variable is the number of times that word appears in the original document. For instance, the new `farm` variable contains a 2 in row 1, because the word "farm" occurs twice in the original `loan_purpose` variable in row 1. Then, after the original `loan_purpose` variable is removed, the remaining variables are all now numerical, and thus the dataset can be input into machine learning algorithms.
 
 Another common text analytics technique is to use two- or three-word phrases, instead of individual words. The idea is the same: the phrases now become variables in the dataset. 
 
-A recent advancement in text analytics is to use a _topic model_ to extract the topics, as opposed to individual words or phrases, from each document . In particular, the most common topic model is Latent Dirichlet Allocation (LDA). LDA can automatically extract high-level topics from text documents. For example, LDA might determine that one document contains the topic, "dairy farming" , while another document contains two other topics, "clothing manufacturing" and "child care." LDA will discover which topics are in which documents. Note that the LDA creates the topics from scratch, based on the input documents; it does not have a list of predefined topics from which it chooses. As a result, the topics are specific to the text data in the given dataset.
+A recent advancement in text analytics is to use a _topic model_ to extract the topics, as opposed to individual words or phrases, from each document . In particular, the most common topic model is Latent Dirichlet Allocation (LDA). LDA can automatically extract high-level topics from text documents. For example, LDA might determine that one document contains the topic "dairy farming," while another document contains two other topics, "clothing manufacturing" and "child care." LDA will discover which topics are in which documents. Note that LDA creates the topics from scratch, based on the input documents; it does not have a list of predefined topics from which it chooses. As a result, the topics are specific to the text data in the given dataset.
 
-The data science team decides to use LDA to extract twelve overarching topics from the stories. The team removes the `story` variable, and adds twelve new variables (i.e., one for each topic) that specify the percentage of words in each story that come from each topic. Exhibit 3 shows the resulting topics, and Exhibit 4 shows a few sample rows in the final dataset that is ready to be input to the machine learning algorithms.
+The data science team decides to use LDA to extract twelve overarching topics from the stories. Once the LDA algorithm is finished, the team removes the original `story` variable, and adds twelve new variables (i.e., one for each discovered topic) that specify the percentage of words in each story that come from each topic. Exhibit 3 shows the resulting topics, and Exhibit 4 shows a few sample rows in the final dataset, which is ready to be input to machine learning algorithms.
 
 
 # Building the Prediction Model
 
 Armed with the final dataset, the data science team can now use machine learning algorithms to build a prediction model for loan defaults. There are lots of machine learning algorithms available, ranging from simple logistic regression, to Naive Bayes, all the way to deep neural networks. For this task, the team decides to use a decision tree algorithm, because of its speed, accuracy, and interpretability. 
 
-In order to determine whether the text (or, more precisely, the topics built from the text) has predictive power, the team builds two similar, but slightly different, decision tree models. The first is built by giving the decision tree algorithm only the numerical and categorical variables from the original dataset, i.e., `sector`, `country`, `gender`, `loan_amount`, and  `non_payment`. The second model is built by giving the decision tree algorithm all of those variables plus the twelve topic variables. The team thus runs the algorithm twice, and recieves two models in return that they can then compare. Exhibit 5 shows the two models and their performance characteristics.
+In order to determine whether the text (or, more precisely, the topics built from the text) has predictive power, the team builds two similar, but slightly different, decision tree models. The first is built by giving the decision tree algorithm only the numerical and categorical variables from the original dataset, i.e., `sector`, `country`, `gender`, `loan_amount`, and  `non_payment`. The second model is built by giving the decision tree algorithm all of those variables plus the twelve topic variables. The team thus runs the algorithm twice, and receives two models in return that they can then compare. Exhibit 5 shows the two models and their performance characteristics.
 
 
 # Case Discussion Questions
@@ -284,7 +284,7 @@ tmpdf = data.frame(Variable=c("id", "sector", "country", "gender", "loan_amount"
                                  "Borrower's country of residence.",
                                  "Borrower's gender.",
                                  "Amount of the loan, in USD.",
-                                 "Who is liable if the loan defaults: the lender, or the partner?",
+                                 "Who is liable if the loan defaults: the lender, or the partner*?",
                                  "Borrower's personal story.",
                                  "Whether borrower defaulted or repaid loan."
                                  ))
@@ -292,7 +292,8 @@ kable(tmpdf, "latex", booktab=TRUE) %>%
   kable_styling(font_size = 10, full_width=TRUE, latex_options = c("striped", "scale_down")) %>%  
   column_spec(2, width = "35em")
 ```
-^1^ Note that all loan applications have an associated field partner, which is local microfinance institution with which Kiva works to find and fund loans. Every loan at Kiva is offered by a partner to a borrower, and the partner works with Kiva to get funding for that loan from lenders.
+
+`*` All loan applications have an associated field partner, which is local microfinance institution with which Kiva works to find and fund loans. Every loan at Kiva is offered by a partner to a borrower, and the partner works with Kiva to get funding for that loan from lenders.
 
 
 
@@ -527,16 +528,16 @@ kable(topic_totals, "latex", booktab=TRUE) %>%
 
 Below is an example of a `story` that contained LDA topic 8 at 99%. 
 
-*Senaida Agueda has a business in which she buys and resells clothing that she has been operating for about 2 years now with the help of loans from Esperanza. She has two children, 41 and 38, whom do not live with Mrs. Agueda. When not working with her clothing shop, she enjoys going to the beach and cooking, arroz con carne (rice with meat) being one of her favorite dishes. As Mrs. Agueda is in her elder years and has fully grown children, she simply wishes to sustain her business to support her and her husband. Mrs. Senaida Agueda is a member of an eight person group, Group 4, that is part of a larger micro-bank called Mujeres de Fe, "Women of Faith" in English. In the picture, Mrs. Agueda is third from the right along with members of her group and some others of Mujeres de Fe. (...)*
+> *Senaida Agueda has a business in which she buys and resells clothing that she has been operating for about 2 years now with the help of loans from Esperanza. She has two children, 41 and 38, whom do not live with Mrs. Agueda. When not working with her clothing shop, she enjoys going to the beach and cooking, arroz con carne (rice with meat) being one of her favorite dishes. As Mrs. Agueda is in her elder years and has fully grown children, she simply wishes to sustain her business to support her and her husband. Mrs. Senaida Agueda is a member of an eight person group, Group 4, that is part of a larger micro-bank called Mujeres de Fe, "Women of Faith" in English. In the picture, Mrs. Agueda is third from the right along with members of her group and some others of Mujeres de Fe. (...)*
 
 Below is an example for LDA topic 4: 
 
- *Descripcin del Negocio. La Sra Angela se dedica a la venta de articulos para el hogar a credito y de forma anbulante ademas vende golosinas a llos nios de una escuela. En la actualidad vende a personas de otros sectores que han sido recomendados por buenos clientes que le refieren esos sitios. Uso del Prstamo. Ella necesita el credito para comprar mas mercaderia pues en estas epocas de fin de aos le son muy solicitadas. Informacin Personal. Ella tiene 29 aos y tiene dos hijos que estudian su casa es de caa y tiene estabilidad familiar. Translated from Spanish by Kiva Volunteer Wendy Wise*
+> *Descripcin del Negocio. La Sra Angela se dedica a la venta de articulos para el hogar a credito y de forma anbulante ademas vende golosinas a llos nios de una escuela. En la actualidad vende a personas de otros sectores que han sido recomendados por buenos clientes que le refieren esos sitios. Uso del Prstamo. Ella necesita el credito para comprar mas mercaderia pues en estas epocas de fin de aos le son muy solicitadas. Informacin Personal. Ella tiene 29 aos y tiene dos hijos que estudian su casa es de caa y tiene estabilidad familiar. Translated from Spanish by Kiva Volunteer Wendy Wise*
 
 
 And finally, below is an example for LDA topic 1:
 
-*Mary is 65 years of age, married with six children. All her children are married and self-reliant. She is a member of St Jude group at Githunguri in Thika district. Mary is earns her income as a dairy farmer. She needs a USD 150 loan to help her buy another small high breed dairy calf, which she will raise to maturity. She plans to meet her repayments on monthly basis.*
+> *Mary is 65 years of age, married with six children. All her children are married and self-reliant. She is a member of St Jude group at Githunguri in Thika district. Mary is earns her income as a dairy farmer. She needs a USD 150 loan to help her buy another small high breed dairy calf, which she will raise to maturity. She plans to meet her repayments on monthly basis.*
 
 
 ```{r, eval=FALSE, include=FALSE}
@@ -590,13 +591,19 @@ kable(aa, "latex", booktab=TRUE, digits=2) %>%
 
 # Exhibit 5: Model Perfomance
 
-Decision tree models were created with the R package `rpart`.
+Decision tree models were created with the R package `rpart`. Here, the decision tree models are automatically created by a machine learning algorithm as the algorithm learns simple decision rules from the data. These automatically-learned rules can then be used to both understand the variables and to predict future data. A big advantage of decision trees over other models is that they are relatively simple for humans to understand and interpret.
+
+A decision tree consists of nodes. Each node splits the data according to a rule. A rule is based on a variable in the data. For example, a rule might be “Age greater than 30.” In this case, the node splits the data by the `age` variable; those passengers that satisfy the rule (i.e., are greater than 30) follow the left path out of the node; the rest follow the right path out of the node. In this way, paths from the root node down to leaf nodes are created, describing the fate of certain types of passengers.
+
+A decision tree path always starts with a root node (node number 1), which contains the most important splitting rule. Each subsequent node contains the next most important rule. After the decision tree is automatically created by the machine learning algorithm, one can use the decision tree to classify an individual by simply following a path: start at the root node and apply each rule to follow the appropriate path until you hit an end.
+
+When creating a decision tree from data, the analyst can specify the number of nodes for the machine learning algorithm to create. More nodes leads to a more accurate model, at the cost of a more complicated and harder-to-interpret model, as well as the risk of over fitting the training data. Likewise, fewer nodes usually leads to a less accurate model, but the model is easier to understand and interpret.
 
 ## Model 1 (No text)
 
 Below is the model that was created from only the original numerical and categorical variables.
 
-```{r fig.height=2}
+```{r fig.height=2.5}
 set.seed(123)
 # Don't want to use either of these for prediction, and the - sign doesn't work
 # with rpart forumulas.
@@ -635,13 +642,15 @@ kable(preds, "latex", booktab=TRUE) %>%
   add_header_above(c(" " = 2, "actual" = 2))
 ```
 
+<P style="page-break-before: always">
+\newpage
 
 ## Model 2 (With Text)
 
 Below is the model that was created from all variables in the dataset.
 
 
-```{r fig.height=2.5}
+```{r fig.height=3.0}
 set.seed(123)
 # Don't want to use either of these for prediction, and the - sign doesn't work
 # with rpart forumulas.
@@ -654,9 +663,10 @@ test_text <- setdiff(df_text, train_text)
 
 # Let's create the model.
 form = as.formula(status ~ .)
-tree <- rpart(form, train_text, method="class")
-rpart.plot(tree, extra=2)
+tree.text <- rpart(form, train_text, method="class")
+rpart.plot(tree.text, extra=2)
 ```
+
 
 <!--
 \vspace{20pt}
@@ -666,7 +676,7 @@ Below is a summary of its predictions:
 
 ```{r, include=FALSE}
 
-predicted.text = predict(tree, test_text, type="class")
+predicted.text = predict(tree.text, test_text, type="class")
 actual.text = test_text$status
 preds.text = data.frame((table(predicted.text, actual.text))) %>%
   spread(actual.text, Freq) %>%
@@ -713,10 +723,6 @@ kable(bb, "latex", booktab=TRUE, digits=3) %>%
 ```
 
 
-
-
-<P style="page-break-before: always">
-\newpage
 
 
 # Appendix 1: Data Collection
