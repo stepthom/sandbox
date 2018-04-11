@@ -85,6 +85,54 @@ ggsave(file="cluster_2.pdf", width=iwidth, height=iheight)
 ```
 
 
+
+
+```{r}
+
+library(ggplot2)
+library(readr)
+library(extrafont)
+loadfonts(quiet = T)
+
+dat <- read_csv("data/Mall_Customers_With_output.csv")
+
+
+iwidth = 10
+iheight = 7
+
+theme_set(theme_gray(base_size = 32))
+
+
+ggplot(dat, aes(x=AnnualIncome, y=SpendingScore)) + 
+  geom_point(color="black", size=10) +
+  geom_rangeframe() + 
+  theme_tufte(base_family="Calibri") + 
+  theme(legend.position="none") + 
+  theme(axis.title.x = element_text(colour="grey20",size=40,face="plain")) + 
+  theme(axis.title.y = element_text(colour="grey20",size=40,face="plain")) + 
+  theme(axis.text.x = element_text(colour="grey20",size=32,face="plain")) + 
+  theme(axis.text.y = element_text(colour="grey20",size=32,face="plain")) +
+  labs(x = "Annual Income (K)", y ="Spending Score") 
+  
+ggsave(file="out/cluster_1.png", width=iwidth, height=iheight)
+
+
+ggplot(dat, aes(x=AnnualIncome, y=SpendingScore)) + 
+  geom_point(aes(color=factor(ClassificationName)), size=10) +
+  geom_rangeframe() + 
+  theme_tufte(base_family="Calibri") + 
+  theme(legend.position="none") + 
+  theme(axis.title.x = element_text(colour="grey20",size=40,face="plain")) + 
+  theme(axis.title.y = element_text(colour="grey20",size=40,face="plain")) + 
+  theme(axis.text.x = element_text(colour="grey20",size=32,face="plain")) + 
+  theme(axis.text.y = element_text(colour="grey20",size=32,face="plain")) +
+  labs(x = "Annual Income (K)", y ="Spending Score") 
+  
+ggsave(file="out/cluster_2.png", width=iwidth, height=iheight)
+
+
+```
+
 ```{r}
 getRandomDat = function(rho) {
   n     <- 50                    # length of vector
