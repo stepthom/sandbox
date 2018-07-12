@@ -1,0 +1,72 @@
+---
+title: "Reformatting the Oxford Data"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+
+```{r }
+# Load the libraries
+library(arules)
+library(arulesViz)
+library(dplyr)
+library(tidyr)
+```
+
+First, we need to load in the data in it's orginal (wide) format.
+
+```{r}
+# Change to the path on your machine
+path = "C:/Users/st50/Desktop/Oxford/"
+
+df <- read.csv(paste(path, "November connected Customers.csv", sep=""), na.strings = c("", "NA"))
+str(df)
+```
+
+Now, reformat into skinny (tidy) format, for ease of use.
+
+```{r}
+# Goal is to convert the data into tidy format. I.e., we want to turn a row like this:
+#
+# top_space_1_name top_space_1_dwell_min top_space_2_name top_space_2_dwell_min top_space_3_name ...
+#         La Senza                    44             <NA>                    NA                  ...
+#
+# into this:
+#
+#  ID       space      type        value
+#   1 top_space_1      name     La Senza
+#   1 top_space_1 dwell_min           44
+
+
+# Note that we are getting rid of the first six columns (demographic data). Can always join back later if necessary, using the ID. 
+
+tidy = df[,-c(1:6)] %>%
+  mutate(ID = row_number()) %>%
+  select(ID, everything()) %>%
+  gather(key, value, -ID) %>%
+  mutate(space = gsub("_name|_dwell_min", "", key)) %>%
+  mutate(type = gsub("top_space_\\d+_", "", key)) %>%
+  filter(!is.na(value)) %>%
+  arrange(ID) %>%
+  select(ID, space, type, value) %>% 
+  spread(type, value, convert=T)
+
+# Do some filtering, according to Manil. (You can do more here if you want.)
+tidy.filtered = tidy %>%
+  filter(dwell_min >= 5)
+
+head(tidy.filtered)
+
+# Write it to a CSV, so we can read it back with read.transactions().
+write.csv(tidy.filtered, paste(path, "November_connected_Customers_tidy.csv", sep=""))
+
+# Read in the data in transaction format, which is necessary for arules
+tidy.trans = read.transactions(paste(path, "November_connected_Customers_tidy.csv", sep=""), format="single", sep=",", cols=c("ID", "name"))
+
+# And you're done! Can start using arules and other packages on the data.
+```
+
