@@ -17,6 +17,8 @@ library(dplyr)
 library(tidyr)
 ```
 
+# Processing the "Connected Customers" files
+
 First, we need to load in the data in it's orginal (wide) format.
 
 ```{r}
@@ -70,3 +72,63 @@ tidy.trans = read.transactions(paste(path, "November_connected_Customers_tidy.cs
 # And you're done! Can start using arules and other packages on the data.
 ```
 
+
+# Processing the "non-connected customers" file
+
+```{r}
+# Change to the path on your machine
+path = "C:/Users/st50/Desktop/Oxford/"
+
+df <- read.csv(paste(path, "Customer Journey for Month of December.csv", sep=""), na.strings = c("", "NA"))
+str(df)
+```
+
+Now, reformat into skinny (tidy) format, for ease of use.
+
+```{r}
+# Goal is to convert the data into tidy format.
+
+# Take a sample, for now.
+df.all = df #back up of the entire thing.
+df = df.all[1:10000,]
+
+library(dplyr)
+library(tidyverse)
+
+tidy = df %>%
+  mutate(ID = row_number()) %>%
+  select(ID, everything()) %>% 
+  select(-X) %>%
+  rename(Space.Name.0 = Space.Name) %>%
+  rename(Space.Type.0 = Space.Type) %>%
+  rename(Space.Dwell.0 = Space.Dwell) %>%
+  gather(key, value, -ID, -Date, -Encrypted.Mac) %>%
+  mutate(space = gsub("Space.Name.|Space.Type.|Space.Dwell.", "", key)) %>%
+  mutate(type = gsub("\\.\\d+", "", key)) %>%
+  filter(!is.na(value)) %>%
+  arrange(ID) %>%
+  select(ID, Date, Encrypted.Mac, space, type, value) %>% 
+  spread(type, value, convert=T) %>%
+  filter(!is.na(Space.Dwell))
+
+head(tidy, n=200)
+```
+
+
+```{r}
+
+# Do some filtering, according to Manil. (You can do more here if you want.)
+tidy.filtered = tidy %>%
+  filter(Space.Dwell. >= 5)
+
+head(tidy.filtered)
+
+# Write it to a CSV, so we can read it back with read.transactions().
+write.csv(tidy.filtered, paste(path, "Customer_Journey_for_Month_of_December_tidy.csv", sep=""))
+
+# Read in the data in transaction format, which is necessary for arules
+tidy.trans = read.transactions(paste(path, "Customer_Journey_for_Month_of_December_tidy.csv", sep=""), format="single", sep=",", cols=c("ID", "Space.Name."))
+
+# And you're done! Can start using arules and other packages on the data.
+tidy.trans
+```
