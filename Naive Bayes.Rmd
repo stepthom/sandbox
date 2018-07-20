@@ -1,0 +1,190 @@
+---
+title: "Naive Bayes - Employee Attrition"
+output: 
+  html_document:
+      toc: yes
+      toc_float: yes
+      code_folding: show
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+##Introduction
+
+In this exercise, we'll be trying to predict employee attrition, or whether or not an employee will leave, using a dataset from the ```rsample``` library. Given the potential disruption to the work environment and the required resources to attract, acquire, and train new talent, understanding factors that influence employee attrition is important to human resource departments.
+
+##Packages
+
+The following packages will be used in this exercise:
+
+- ```rsample``` contains a number attrition data set called ```attrition```
+- ```dplyr``` is a popular package for manipulating data in R
+- ```ggplot2``` is an extremely powerful data visualization package
+- ```caret``` is a classical machine learning framework popular in R
+- ```corrplot``` is a visualization library for correlation
+
+If you don't have these installed, run the following code chunk.
+
+```{r install_packages, warning = FALSE, message = FALSE}
+
+# install.packages("tibble")
+# install.packages("rsample")
+# install.packages("dplyr")
+# install.packages("ggplot2")
+# install.packages("corrplot")
+# install.packages("caret")
+
+```
+
+
+Once installed, you can use the following code chunk to load the libraries.
+
+```{r load_packages, warning = FALSE, message = FALSE}
+library(tibble)
+library(dplyr)    # data transformation
+library(rsample)  # data splitting 
+library(ggplot2)  # data visualization
+library(corrplot)
+library(caret) # implementing with caret 
+library(corrr)
+library(knitr)
+```
+
+##Data Exploration
+
+Let's start by exploring the data set a bit, using the ```dim()```, ```names()```, and ```str()``` functions. ```dim()``` returns the dimensions of a dataset, in our case a data frame with 1470 rows and 31 columns. 
+
+```{r, warning = FALSE, message = FALSE}
+attrition %>% dim()
+```
+
+The ```names``` function returns the names of the columns in our dataset. The ```%>%``` operator is called a "pipe", passing the object to the left of it into the function on the right of it. Have a look through the column names to get a feel for the data. 
+
+```{r, warning = FALSE, message = FALSE}
+attrition %>% names()
+```
+
+The ```str()``` function returns the structure of our dataset, such as the data type of each column, a sample of each column etc. 
+
+```{r, warning = FALSE, message = FALSE}
+attrition %>% str()
+```
+
+Based on the above output, are there any data types that need to be changed? The code chunk below changes some integer columns to categorical columns - try adding others!
+
+```{r, warning = FALSE, message = FALSE}
+attrition <- attrition %>%
+  mutate(
+    JobLevel = factor(JobLevel),
+    StockOptionLevel = factor(StockOptionLevel),
+    TrainingTimesLastYear = factor(TrainingTimesLastYear)
+  )
+```
+
+Now that we have a sense of what our data contains, let's see if we can explore some basic patterns. How does ```JobSatisfaction``` impact attrition? What about ```WorkLifeBalance```?
+
+```{r}
+df <- attrition
+table(df$JobSatisfaction, df$Attrition) %>% 
+  prop.table() %>% 
+  kable()
+```
+
+```{r}
+table(df$WorkLifeBalance, df$Attrition) %>% 
+  prop.table() %>% 
+  kable()
+```
+
+##Data Visualization
+
+Since there are multiple explanaory variables in this dataset, let's use some visual techniques to identify patterns more efficiently. For instance, let's try using density and bar plots to identify patterns in both numeric and categorical data, respectively.
+
+Are there any interesting patterns that emerge?
+
+```{r, warning = FALSE, message = FALSE, fig.height = 8}
+numeric_attrition <- attrition %>% 
+  select(which(sapply(., class)=="integer"), Attrition) 
+
+numeric_attrition %>% 
+  gather(metric, value, -Attrition) %>% 
+  ggplot(aes(value, fill = Attrition)) + 
+  geom_density(show.legend = TRUE, alpha = 0.75) + 
+  facet_wrap(~ metric, scales = "free", ncol = 3) +
+  theme_bw() +
+  labs(x = "", y = "")
+
+categoric_attrition <- attrition %>% 
+  select(which(sapply(., class)=="factor"), Attrition) %>% 
+  select(which(sapply(., nlevels)<=5))
+
+categoric_attrition %>% 
+  gather(metric, value, -Attrition) %>% 
+  ggplot(aes(value, fill = Attrition)) + 
+  geom_bar(position = "dodge", col = "black") + 
+  facet_wrap(~ metric, ncol = 3, scales = "free") + 
+  theme_bw() + 
+  theme(axis.text.x = element_text(angle = 90)) 
+  
+```
+
+What if we look at correlation data?
+
+```{r, message = FALSE, warning = FALSE}
+numeric_attrition %>% 
+  select(-Attrition) %>% 
+  cor() %>% 
+  corrplot(method = "shade", type = "lower")
+```
+
+##Model
+
+```{r, message = FALSE, warning = FALSE}
+
+set.seed(123)
+split <- initial_split(attrition, prop = .7, strata = "Attrition")
+train <- training(split)
+test  <- testing(split)
+
+# create response and feature data
+features <- setdiff(names(train), "Attrition")
+x <- train[, features]
+y <- train$Attrition
+
+nb.m1 <- train(
+  x = x,
+  y = y,
+  method = "naive_bayes"
+  )
+
+# results
+confusionMatrix(nb.m1)
+
+```
+
+```{r, message = FALSE, warning = FALSE}
+
+varImp(nb.m1)
+
+```
+
+
+```{r, message = FALSE, warning = FALSE}
+
+new_features <- c("Age", "JobLevel", "MonthlyIncome")
+
+x <- train[, new_features]
+y <- train$Attrition
+
+nb.m2 <- train(
+  x = x,
+  y = y,
+  method = "naive_bayes"
+  )
+```
+
+
+
+
