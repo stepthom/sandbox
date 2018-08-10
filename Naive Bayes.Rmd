@@ -31,11 +31,13 @@ If you don't have these installed, please install them now. If you're not sure h
 
 ```{r install_packages, warning = FALSE, message = FALSE}
 
+# install.packages("knitr")
 # install.packages("tibble")
 # install.packages("rsample")
 # install.packages("dplyr")
 # install.packages("ggplot2")
 # install.packages("corrplot")
+# install.packages("corrr")
 # install.packages("caret")
 
 ```
@@ -75,16 +77,13 @@ attrition %>% names() %>% kable()
 
 Now we know which features are available to us, but what *kind* of data is it? We could use the ```class()``` function to return the data type on an individual column, but the ```str()``` function can be used to tell us the data type of all columns in the dataset, including the different levels of categorical data, a small sample of each data, and many other helpful pieces of information. Similarly, try the ```glimpse()``` function for another view.
 
+**Question:** Based on the above below, are there any data types that you think need to be changed? Take ```JobLevel``` for instance, should that really be an integer? Or does it feel more like a category variable? The code chunk below changes the datatype of some columns - but feel free to try some others!
+
 ```{r, warning = FALSE, message = FALSE}
 attrition %>% str()
 ```
 
-Based on the above output, are there any data types that you think need to be changed? Take ```JobLevel``` for instance, should that really be an integer? Or does it feel more like a category variable? The code chunk below changes the datatype of some columns - but feel free to try some others!
-
-JobLevel class before:
-
 ```{r, warning = FALSE, message = FALSE}
-class(attrition$JobLevel)
 attrition <- attrition %>%
   mutate(
     JobLevel = factor(JobLevel),
@@ -94,17 +93,12 @@ attrition <- attrition %>%
   )
 ```
 
-JobLevel class after:
-```{r, warning = FALSE, message = FALSE}
-class(attrition$JobLevel)
-```
-
 **Note:** If this is your first time using the ```dplyr``` library, you might be wondering what ```mutate``` does. You can think of this function as just another way to create a variable in a dataframe. The ```dplyr``` library is one of the best ways in R to wrangle / transform your data so that it's in a format that is easily digestible by models or plotting code. The [following course](https://www.datacamp.com/courses/dplyr-data-manipulation-r-tutorial) is a great introduction to the many different transformations you can do. 
 
 
-Okay, let's see if we can find some basic patterns. Try using the ```table()``` function to calculate a count basic table from two categorical variables. You then pass the count table into the ```prop.table()``` function to return the percentages. 
+Let's see if we can spot some basic patterns. Try using the ```table()``` function to calculate a count basic table from two categorical variables. You then pass the count table into the ```prop.table()``` function to return the percentages. 
 
-Have a look below. How does ```JobSatisfaction``` impact ```Attrition```?
+**Question:** Have a look below. How does ```JobSatisfaction``` impact ```Attrition```?
 
 ```{r}
 df <- attrition
@@ -113,7 +107,7 @@ table(df$JobSatisfaction, df$Attrition) %>%
   kable()
 ```
 
-What about ```WorkLifeBalance```? 
+**Question:** What about ```WorkLifeBalance```? 
 
 ```{r}
 table(df$WorkLifeBalance, df$Attrition) %>% 
@@ -125,9 +119,9 @@ table(df$WorkLifeBalance, df$Attrition) %>%
 
 Often times, you're going to be working with datasets that have many, many variables, and looking for patterns one by one is not a feasible solution. Let's use some visual techniques to identify patterns more efficiently. Do any interesting patterns emerge?
 
-**Note:** Visualizing categorical and numerical data can be accomplished in many different ways, but using density plots for numeric data and bar plots for categorical data is a good place to start start. The ```ggplot2``` library uses a philosophy known as the "grammar of graphics", and while very powerful once understood, does come with its own learning curve. Thankfully, there is a [three-part series](https://www.datacamp.com/courses/data-visualization-with-ggplot2-1) on the topic to get you started. Until then, here is one visualization approach that hopefully gets you excited to learn it.
+**Note:** Visualizing categorical and numerical data can be accomplished in many different ways, but using density plots for numeric data and bar plots for categorical data is a good place to start start. The ```ggplot2``` library uses a philosophy known as the "grammar of graphics", and while very powerful once understood, does come with its own learning curve. Thankfully, there is a [three-part series](https://www.datacamp.com/courses/data-visualization-with-ggplot2-1) on the topic to get you started. Until then, here is one visualization approach that hopefully gets you excited to learn the library.
 
-**Numerical:**
+**Numerical Variables:**
 ```{r, warning = FALSE, message = FALSE, fig.height = 8}
 numeric_attrition <- attrition %>% 
   select(which(sapply(., class)=="integer"), Attrition) 
@@ -141,7 +135,7 @@ numeric_attrition %>%
   labs(x = "", y = "")
 ```
 
-**Categorical:**
+**Categorical Variables:**
 ```{r,warning = FALSE, message = FALSE, fig.height = 8}
 categoric_attrition <- attrition %>% 
   select(which(sapply(., class)=="factor"), Attrition) %>% 
@@ -153,13 +147,16 @@ categoric_attrition %>%
   geom_bar(position = "dodge", col = "black") + 
   facet_wrap(~ metric, ncol = 3, scales = "free") + 
   theme_bw() + 
-  theme(axis.text.x = element_text(angle = 90)) 
+  theme(axis.text.x = element_text(angle = 90)) +
+  labs(x = "", y = "")
   
 ```
 
-Another way to look at the data is to use a correlation plot, which shows how each variable is correlated to every other variable. For simplicity, we'll only be looking at the correlation between numeric data, but [this resource](https://www.r-bloggers.com/to-eat-or-not-to-eat-thats-the-question-measuring-the-association-between-categorical-variables/) may provide useful for this inclined to try. 
+Another way to look at the data is to use a correlation plot, which shows how each variable is correlated to every other variable. For simplicity, we'll only be looking at the correlation between numeric data, but [this resource](https://www.r-bloggers.com/to-eat-or-not-to-eat-thats-the-question-measuring-the-association-between-categorical-variables/) provides an approach for categorical data. 
 
-For the numerical correlation plot, we need to first calculate the correlation matrix using the ```cor()``` function. Then, we can pass that into ```corrplot()``` from the ```corrplot``` library to get the output. Have a look at below - does anything stand out? Try combining the information from the previous visualizations and see if you can come up with some hypotheses about why employees leave. Remember these for later on when we get to the results!
+For the numerical correlation plot, we need to first calculate the correlation matrix using the ```cor()``` function. Then, we pass the resulting matrix into ```corrplot()```, which outputs our correlation plot. 
+
+**Question:** Does anything from the correlation plot stand out? Try combining your observations from the previous visualizations and see if you can come up with some hypotheses about why employees leave. Remember these for later on when we get to the results!
 
 ```{r, message = FALSE, warning = FALSE}
 numeric_attrition %>% 
@@ -172,30 +169,27 @@ numeric_attrition %>%
 
 ###Naive Bayes
 
-Before we use the Naive Bayes algorithm on the entire dataset, let's try practicing it on a small subset of the data. Let's pretend we only have the first ten rows of two explanatory variables of interest: ```Gender``` and ```BusinesTravel```. Given this dataset, what is the probability that a male who travels rarely will leave the company? To answer this, you'll need the following information. Good luck!
+Before we use the Naive Bayes algorithm on the entire dataset, let's try practicing it on a small subset of the data. Let's pretend we only have the first ten rows of two explanatory variables of interest: ```Gender``` and ```BusinesTravel```. 
 
+**Question:** Given this dataset, what is the probability that a **male who travels rarely** will leave the company? To answer this, you'll need the following information. If you get stuck, try following [this tutorial](https://monkeylearn.com/blog/practical-explanation-naive-bayes-classifier/) to point you in the right direction. Good luck!
+
+**Naive Bayes Tables**
 ```{r}
 subset <- attrition %>% select(Attrition, Gender, BusinessTravel) %>% head(10)
 
 kable(subset, align = "c")
 
-table(subset$Attrition) %>% kable(align = "c", col.names = c("Attrition", "Frequency"))
-table(subset$Attrition, subset$Gender) %>% kable(align = "c")
-table(subset$Attrition, subset$BusinessTravel) %>% kable(align = "c")
+table(subset$Attrition)# %>% kable(align = "c", col.names = c("Attrition", "Frequency"))
+table(subset$Attrition, subset$Gender)# %>% kable(align = "c")
+table(subset$Attrition, subset$BusinessTravel) #%>% kable(align = "c")
 
 ```
 
-If you found that a bit confusing, try practicing on another small data set from [this tutorial](https://monkeylearn.com/blog/practical-explanation-naive-bayes-classifier/), it just takes a few minutes.
+###Implementation
 
-###Caret Implementation
+The ```caret``` package is one of the most popular machine learning libraries in R because it provides a common way (framework) to train machine learning models. It acts as a wrapper around packages with different algorithm implementations, so instead of having to learn the syntax for every single package, you can just use common functions in ```caret```. The author of the package, Max Kuhn, maintains an [active documentation / tutorial](https://topepo.github.io/caret/) website that contains everything you need to know about the library. He also happens to be the author of your textbook, "Applied Predictive Modeling", which *also* has an entire package dedicated to it, aptly named ```AppliedPredictiveModeling```.
 
-If you're going to be doing any machine learning in R, chances are you'll come across the ```caret``` package. This library is so popular because it provides a common way (framework) to train machine learning models, by acting as a wrapper around packages with different algorithm implementations. So instead of having to learn the syntax for every single package each time, you can just use the ```caret``` package and you're all set.
-
-The author of the package, Max Kuhn, maintains an [active documentation / tutorial](https://topepo.github.io/caret/) website that contains everything you need to know about the library He also happens to be the author of your textbook, "Applied Predictive Modeling", which *also* happens to have an entire package dedicated to it, aptly named ```AppliedPredictiveModeling```.
-
-Given the amount of resources available on ```caret```, we won't cover it in much detail here. All you have to know for now is that the primary function is ```train()``` which has an argument called ```method``` used to specify which implementation you want to use. What is happening under the hood is the ```method``` argument is fetching the desired package implementation, which is it may prompt you to install a package if you haven't yet used it before. There's a list of all 237 possible algorithm implementations [here](https://topepo.github.io/caret/available-models.html). We'll be using the ```naive_bayes``` method. 
-
-Okay, let's start by splitting the data into training and testing sets. Here we'll use the ```initial_split()``` function, which essentially creates an index from which the ```training()``` and ```testing()``` functions extract the data. For simplicity, let's use a 70/30% training / testing dataset. 
+Before we start building our model, we need to split the data into training and testing sets. Here we'll use the ```initial_split()``` function, which essentially creates an index from which the ```training()``` and ```testing()``` functions extract the data.
 
 **Question:** Have a look at the code chunk below - what do you think the ```strata = ``` argument is doing? *Hint:* Take a look at the proportions of the ```Attrition``` categories in both the training / testing set below. 
 
@@ -207,24 +201,26 @@ train <- training(split)
 test  <- testing(split)
 ```
 
-**Training Set:**
 ```{r, message = FALSE, warning = FALSE}
-table(train$Attrition) %>% prop.table() %>% kable(col.names = c("Attrtion", "Freq (%)"))
+table(train$Attrition) %>% prop.table() %>% kable(col.names = c("Training Set: Attrition", "Freq (%)"), align = "c")
 ```
 
-**Testing Set:**
 ```{r, message = FALSE, warning = FALSE}
-table(test$Attrition) %>% prop.table() %>% kable(col.names = c("Attrtion", "Freq (%)"))
+table(test$Attrition) %>% prop.table() %>% kable(col.names = c("Testing Set: Attrition", "Freq (%)"), align = "c")
 ```
 
-Okay, time to finally build a model in ```caret``` ! First we use the ```train()``` function with ```method = "naive_bayes"``` to build the model and save it to a variable. Then we use the ```confusionMatrix()``` function to check out the model performance on the test using the ```predict()``` function. The results are printed out below. How well does the model predict attrition? Is this a good model?
+###Results
 
+In ```caret```, the ```train()``` function is the primary way to build machine learning models, and the argument ```method``` is used to specify which implementation you want to use. Under the hood, the ```method``` argument retrieves the desired package implementation, which is why you may be prompted to install a package if you're trying a new algorithm. [Here's](https://topepo.github.io/caret/available-models.html) a list of all 237 possible algorithm implementations - today, we'll be using the ```naive_bayes``` method. Once built, we will use the ```predict()``` function on the test set to get our estimates, and then use the ```confusionMatrix()``` function to evaluate performance. For the sake of comparison, we've also trained a k-Nearest Neighbours (kNN) and a Support Vector Machine (SVM) model, which you will learn about a little later on in the lecture. 
+
+**Question:** The results of the NB, kNN, and SVM models are presented below. Calculate the accuracy of each model using the provided confusion matrix. Which model would you select?
+
+**Naive Bayes Test Confusion Matrix:**
 ```{r, message = FALSE, warning = FALSE}
 nb.m1 <- train(
   Attrition ~ .,
   data = train,
-  method = "naive_bayes",
-  metric = "Kappa"
+  method = "naive_bayes"
   )
 
 predictions_nb <- predict(nb.m1, test)
@@ -233,13 +229,9 @@ actuals <- test$Attrition
 # Testing Results
 conf_matrix_nb <- confusionMatrix(predictions_nb, actuals)
 conf_matrix_nb$table
-round(conf_matrix_nb$overall[1], 4)*100
 ```
 
-
-
-
-
+**k-Nearest Neighbours Test Confusion Matrix:**
 ```{r, message = FALSE, warning = FALSE}
 knn.m1 <- train(
   Attrition ~ .,
@@ -251,8 +243,10 @@ predictions_knn <- predict(knn.m1, test)
 
 # Testing Results
 conf_matrix_knn <- confusionMatrix(predictions_knn, actuals)
+conf_matrix_knn$table
 ```
 
+**Support Vector Machine Test Confusion Matrix:**
 ```{r, message = FALSE, warning = FALSE}
 svm.m1 <- train(
   Attrition ~.,
@@ -265,4 +259,20 @@ predictions_svm <- predict(svm.m1, test)
 
 # Testing Results
 conf_matrix_svm <- confusionMatrix(predictions_svm, actuals)
+conf_matrix_svm$table
 ```
+
+##Discussion
+
+Given the results below, you may be inclined to choose the SVM model. But is accuracy the only metric that matters? Go back and have another look at how well each model correctly classifies **just the employees that leave**. How would your model selection change? Why? Is accuracy the only metric that matters in classification problems?
+
+```{r, message = FALSE, warning = FALSE}
+accuracy_nb <- round(conf_matrix_nb$overall[1], 4)*100
+accuracy_knn <- round(conf_matrix_knn$overall[1], 4)*100
+accuracy_svm <- round(conf_matrix_svm$overall[1], 4)*100
+
+accuracy <- data.frame(Model = c("NB", "kNN", "SVM"), Accuracy = c(accuracy_nb, accuracy_knn, accuracy_svm))
+
+ggplot(accuracy, aes(x = Model, y = Accuracy)) + geom_col(fill = "blue", alpha = 0.6, col = "black") + labs(x = "", y = "Accuracy (%)") + ylim(0, 100) + theme_bw() + labs(title = "Comparison of NB, kNN, and SVM Results")
+```
+
