@@ -276,3 +276,11 @@ accuracy <- data.frame(Model = c("NB", "kNN", "SVM"), Accuracy = c(accuracy_nb, 
 ggplot(accuracy, aes(x = Model, y = Accuracy)) + geom_col(fill = "blue", alpha = 0.6, col = "black") + labs(x = "", y = "Accuracy (%)") + ylim(0, 100) + theme_bw() + labs(title = "Comparison of NB, kNN, and SVM Results")
 ```
 
+**Question:** The table below shows the relative importance of each feature in the Naive Bayes model as calculated by ```caret```. Do the importance of these features surprise you? Can you come up with a hypotheses as to why employees leave?
+
+```{r}
+
+varImp(nb.m1)$importance %>% add_rownames("Feature") %>% select(Feature, Importance = Yes) %>% mutate(Importance = round(Importance, 2)) %>% arrange(desc(Importance)) %>% kable(col.names = c("Feature", "Relative Importance (%)"), align = "c")
+
+```
+

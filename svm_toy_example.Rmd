@@ -1,0 +1,25 @@
+---
+title: "svm_toy"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+toy <- read.csv("data/svm_toy.csv")
+coords_x_y <- paste("(", toy$x,",", toy$y, ")", sep = "")
+ggplot(toy, aes(x = x, y = y, col = col)) + geom_point(size = 4) + geom_vline(aes(xintercept = 0), linetype = "dashed") + geom_hline(aes(yintercept = 0), linetype = "dashed") + theme_bw(base_size = 12) + geom_label(aes(x, y + 1, label = coords), col = "black") + scale_x_continuous(breaks = -5:5) + scale_y_continuous(breaks = -5:5) + labs(x = "", y = "") + guides(col=FALSE)
+
+```
+
+```{r}
+
+ggplot(toy, aes(x = z_2, y = 0, col = col)) + geom_point(size = 5) + geom_label(aes(x = z_1, 0.25, label = coords)) + theme_bw() + guides(col = FALSE) + ylim(0, 1) + labs(y = "", x = "Z Plane") + scale_y_continuous(labels = NULL) + scale_x_continuous(breaks = seq(-50, 50, by = 5))
+
+
+```
+
+
+
