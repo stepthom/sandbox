@@ -4,7 +4,7 @@ output:
   html_document:
       toc: yes
       toc_float: yes
-      code_folding: show
+      code_folding: hide
 ---
 
 ```{r setup, include=FALSE}
@@ -13,19 +13,21 @@ knitr::opts_chunk$set(echo = TRUE)
 
 ##Introduction
 
-In this exercise, we'll be trying to predict employee attrition, or whether or not an employee will leave, using a dataset from the ```rsample``` library. Given the potential disruption to the work environment and the required resources to attract, acquire, and train new talent, understanding factors that influence employee attrition is important to human resource departments.
+Given the potential disruption to the work environment and the required resources to attract, acquire, and train new talent, understanding factors that influence employee attrition is important to human resource departments. In this exercise, we'll explore the IBM Human Resources Analytics dataset, which contains data on employee attrition (whether an employee will leave the company).  Throughout this exercise, we'll review basic data wrangling and visualization, as well as classification algorithms such as Naive Bayes, k-Nearest Neighbors, and Support Vector Machines. Additionally, we will compare the models using classification metrics and explain why certain metrics can be misleading.
+
+You'll notice on the right hand side of this document a number of dropdown menus that can be used to unhide the code used to generate the outputs. There will be questions guiding you through this analysis that ask you certain questions about the data. Please use the accompanying practice RMarkdown file to try and generate the correct outputs on your own before peeking! If you get stuck, we have added links throughout the document to point you in the right direction.
 
 ##Packages
 
-The following packages will be used in this exercise:
+First, let's have a look at some of the packages that will be used in this exercise:
 
-- ```rsample``` contains a number attrition data set called ```attrition```
+- ```rsample``` contains the IBM attrition data set called ```attrition```, also helpful for sampling data
 - ```dplyr``` is a popular package for manipulating data in R
-- ```ggplot2``` is an extremely powerful data visualization package
-- ```caret``` is a classical machine learning framework popular in R
-- ```corrplot``` is a visualization library for correlation
+- ```ggplot2``` is robust and flexible data visualization package
+- ```caret``` is a statisitcal / machine learning wrapper or framework for other ML packages
+- ```corrplot``` is a visualization library specifically for correlation
 
-If you don't have these installed, run the following code chunk.
+If you don't have these installed, please install them now. If you're not sure how to do this, try the ```install.packages()``` function with the package name in quotes. 
 
 ```{r install_packages, warning = FALSE, message = FALSE}
 
@@ -38,8 +40,7 @@ If you don't have these installed, run the following code chunk.
 
 ```
 
-
-Once installed, you can use the following code chunk to load the libraries.
+Once installed, we need to load the packages into our library using the ```library()``` function. Be sure to watch out for errors when loading libraries! Sometimes two libraries will share a common function name, and loading them both will cause conflicts known as "masking".
 
 ```{r load_packages, warning = FALSE, message = FALSE}
 library(tibble)
@@ -54,36 +55,56 @@ library(knitr)
 
 ##Data Exploration
 
-Let's start by exploring the data set a bit, using the ```dim()```, ```names()```, and ```str()``` functions. ```dim()``` returns the dimensions of a dataset, in our case a data frame with 1470 rows and 31 columns. 
+The data that we will be using was already loaded into memory when we loaded the ```rsample``` library. Reading data into R is beyond the scope of this document, but interested students should have a look at [this online tutorial](https://www.datacamp.com/community/tutorials/r-data-import-tutorial).
+
+Now that the data is available to us, let's start by exploring the data set a bit. There are a number of ways to do this, but using the ```dim()```, ```names()```, and ```str()``` functions are a good place to start. If you're not sure what they mean, try typing ```?dim``` in the console to read the documentation. 
+
+What is the dimension of the dataset?
 
 ```{r, warning = FALSE, message = FALSE}
 attrition %>% dim()
 ```
 
-The ```names``` function returns the names of the columns in our dataset. The ```%>%``` operator is called a "pipe", passing the object to the left of it into the function on the right of it. Have a look through the column names to get a feel for the data. 
+**Note:** For those following along in RStudio, you may be wondering what the ```%>%``` is doing here. This is called the "pipe operator", which passes whatever is on the left into whatever is on the right. While it's not immediately obvious why this might be useful, the [following tutorial](https://www.datacamp.com/community/tutorials/pipe-r-tutorial) provides some helpful information about its historical use in programming languages and how it works in R. At their core, pipe operators make your code more readable by avoiding nested functions. 
+
+So we have a dataset with 31 columns and 1470 rows, but what exactly does the dataset look like? What are the names of the columns in our data? *Hint:* Try the ```names()``` function. 
 
 ```{r, warning = FALSE, message = FALSE}
-attrition %>% names()
+attrition %>% names() %>% kable()
 ```
 
-The ```str()``` function returns the structure of our dataset, such as the data type of each column, a sample of each column etc. 
+Now we know which features are available to us, but what *kind* of data is it? We could use the ```class()``` function to return the data type on an individual column, but the ```str()``` function can be used to tell us the data type of all columns in the dataset, including the different levels of categorical data, a small sample of each data, and many other helpful pieces of information. Similarly, try the ```glimpse()``` function for another view.
 
 ```{r, warning = FALSE, message = FALSE}
 attrition %>% str()
 ```
 
-Based on the above output, are there any data types that need to be changed? The code chunk below changes some integer columns to categorical columns - try adding others!
+Based on the above output, are there any data types that you think need to be changed? Take ```JobLevel``` for instance, should that really be an integer? Or does it feel more like a category variable? The code chunk below changes the datatype of some columns - but feel free to try some others!
+
+JobLevel class before:
 
 ```{r, warning = FALSE, message = FALSE}
+class(attrition$JobLevel)
 attrition <- attrition %>%
   mutate(
     JobLevel = factor(JobLevel),
     StockOptionLevel = factor(StockOptionLevel),
-    TrainingTimesLastYear = factor(TrainingTimesLastYear)
+    TrainingTimesLastYear = factor(TrainingTimesLastYear),
+    Attrition = factor(Attrition, levels = c("Yes", "No"))
   )
 ```
 
-Now that we have a sense of what our data contains, let's see if we can explore some basic patterns. How does ```JobSatisfaction``` impact attrition? What about ```WorkLifeBalance```?
+JobLevel class after:
+```{r, warning = FALSE, message = FALSE}
+class(attrition$JobLevel)
+```
+
+**Note:** If this is your first time using the ```dplyr``` library, you might be wondering what ```mutate``` does. You can think of this function as just another way to create a variable in a dataframe. The ```dplyr``` library is one of the best ways in R to wrangle / transform your data so that it's in a format that is easily digestible by models or plotting code. The [following course](https://www.datacamp.com/courses/dplyr-data-manipulation-r-tutorial) is a great introduction to the many different transformations you can do. 
+
+
+Okay, let's see if we can find some basic patterns. Try using the ```table()``` function to calculate a count basic table from two categorical variables. You then pass the count table into the ```prop.table()``` function to return the percentages. 
+
+Have a look below. How does ```JobSatisfaction``` impact ```Attrition```?
 
 ```{r}
 df <- attrition
@@ -91,6 +112,8 @@ table(df$JobSatisfaction, df$Attrition) %>%
   prop.table() %>% 
   kable()
 ```
+
+What about ```WorkLifeBalance```? 
 
 ```{r}
 table(df$WorkLifeBalance, df$Attrition) %>% 
@@ -100,10 +123,11 @@ table(df$WorkLifeBalance, df$Attrition) %>%
 
 ##Data Visualization
 
-Since there are multiple explanaory variables in this dataset, let's use some visual techniques to identify patterns more efficiently. For instance, let's try using density and bar plots to identify patterns in both numeric and categorical data, respectively.
+Often times, you're going to be working with datasets that have many, many variables, and looking for patterns one by one is not a feasible solution. Let's use some visual techniques to identify patterns more efficiently. Do any interesting patterns emerge?
 
-Are there any interesting patterns that emerge?
+**Note:** Visualizing categorical and numerical data can be accomplished in many different ways, but using density plots for numeric data and bar plots for categorical data is a good place to start start. The ```ggplot2``` library uses a philosophy known as the "grammar of graphics", and while very powerful once understood, does come with its own learning curve. Thankfully, there is a [three-part series](https://www.datacamp.com/courses/data-visualization-with-ggplot2-1) on the topic to get you started. Until then, here is one visualization approach that hopefully gets you excited to learn it.
 
+**Numerical:**
 ```{r, warning = FALSE, message = FALSE, fig.height = 8}
 numeric_attrition <- attrition %>% 
   select(which(sapply(., class)=="integer"), Attrition) 
@@ -115,7 +139,10 @@ numeric_attrition %>%
   facet_wrap(~ metric, scales = "free", ncol = 3) +
   theme_bw() +
   labs(x = "", y = "")
+```
 
+**Categorical:**
+```{r,warning = FALSE, message = FALSE, fig.height = 8}
 categoric_attrition <- attrition %>% 
   select(which(sapply(., class)=="factor"), Attrition) %>% 
   select(which(sapply(., nlevels)<=5))
@@ -130,7 +157,9 @@ categoric_attrition %>%
   
 ```
 
-What if we look at correlation data?
+Another way to look at the data is to use a correlation plot, which shows how each variable is correlated to every other variable. For simplicity, we'll only be looking at the correlation between numeric data, but [this resource](https://www.r-bloggers.com/to-eat-or-not-to-eat-thats-the-question-measuring-the-association-between-categorical-variables/) may provide useful for this inclined to try. 
+
+For the numerical correlation plot, we need to first calculate the correlation matrix using the ```cor()``` function. Then, we can pass that into ```corrplot()``` from the ```corrplot``` library to get the output. Have a look at below - does anything stand out? Try combining the information from the previous visualizations and see if you can come up with some hypotheses about why employees leave. Remember these for later on when we get to the results!
 
 ```{r, message = FALSE, warning = FALSE}
 numeric_attrition %>% 
@@ -139,52 +168,101 @@ numeric_attrition %>%
   corrplot(method = "shade", type = "lower")
 ```
 
-##Model
+##Modeling
+
+###Naive Bayes
+
+Before we use the Naive Bayes algorithm on the entire dataset, let's try practicing it on a small subset of the data. Let's pretend we only have the first ten rows of two explanatory variables of interest: ```Gender``` and ```BusinesTravel```. Given this dataset, what is the probability that a male who travels rarely will leave the company? To answer this, you'll need the following information. Good luck!
+
+```{r}
+subset <- attrition %>% select(Attrition, Gender, BusinessTravel) %>% head(10)
+
+kable(subset, align = "c")
+
+table(subset$Attrition) %>% kable(align = "c", col.names = c("Attrition", "Frequency"))
+table(subset$Attrition, subset$Gender) %>% kable(align = "c")
+table(subset$Attrition, subset$BusinessTravel) %>% kable(align = "c")
+
+```
+
+If you found that a bit confusing, try practicing on another small data set from [this tutorial](https://monkeylearn.com/blog/practical-explanation-naive-bayes-classifier/), it just takes a few minutes.
+
+###Caret Implementation
+
+If you're going to be doing any machine learning in R, chances are you'll come across the ```caret``` package. This library is so popular because it provides a common way (framework) to train machine learning models, by acting as a wrapper around packages with different algorithm implementations. So instead of having to learn the syntax for every single package each time, you can just use the ```caret``` package and you're all set.
+
+The author of the package, Max Kuhn, maintains an [active documentation / tutorial](https://topepo.github.io/caret/) website that contains everything you need to know about the library He also happens to be the author of your textbook, "Applied Predictive Modeling", which *also* happens to have an entire package dedicated to it, aptly named ```AppliedPredictiveModeling```.
+
+Given the amount of resources available on ```caret```, we won't cover it in much detail here. All you have to know for now is that the primary function is ```train()``` which has an argument called ```method``` used to specify which implementation you want to use. What is happening under the hood is the ```method``` argument is fetching the desired package implementation, which is it may prompt you to install a package if you haven't yet used it before. There's a list of all 237 possible algorithm implementations [here](https://topepo.github.io/caret/available-models.html). We'll be using the ```naive_bayes``` method. 
+
+Okay, let's start by splitting the data into training and testing sets. Here we'll use the ```initial_split()``` function, which essentially creates an index from which the ```training()``` and ```testing()``` functions extract the data. For simplicity, let's use a 70/30% training / testing dataset. 
+
+**Question:** Have a look at the code chunk below - what do you think the ```strata = ``` argument is doing? *Hint:* Take a look at the proportions of the ```Attrition``` categories in both the training / testing set below. 
 
 ```{r, message = FALSE, warning = FALSE}
+set.seed(1234)
 
-set.seed(123)
 split <- initial_split(attrition, prop = .7, strata = "Attrition")
 train <- training(split)
 test  <- testing(split)
+```
 
-# create response and feature data
-features <- setdiff(names(train), "Attrition")
-x <- train[, features]
-y <- train$Attrition
+**Training Set:**
+```{r, message = FALSE, warning = FALSE}
+table(train$Attrition) %>% prop.table() %>% kable(col.names = c("Attrtion", "Freq (%)"))
+```
 
+**Testing Set:**
+```{r, message = FALSE, warning = FALSE}
+table(test$Attrition) %>% prop.table() %>% kable(col.names = c("Attrtion", "Freq (%)"))
+```
+
+Okay, time to finally build a model in ```caret``` ! First we use the ```train()``` function with ```method = "naive_bayes"``` to build the model and save it to a variable. Then we use the ```confusionMatrix()``` function to check out the model performance on the test using the ```predict()``` function. The results are printed out below. How well does the model predict attrition? Is this a good model?
+
+```{r, message = FALSE, warning = FALSE}
 nb.m1 <- train(
-  x = x,
-  y = y,
-  method = "naive_bayes"
+  Attrition ~ .,
+  data = train,
+  method = "naive_bayes",
+  metric = "Kappa"
   )
 
-# results
-confusionMatrix(nb.m1)
+predictions_nb <- predict(nb.m1, test)
+actuals <- test$Attrition
 
+# Testing Results
+conf_matrix_nb <- confusionMatrix(predictions_nb, actuals)
+conf_matrix_nb$table
+round(conf_matrix_nb$overall[1], 4)*100
+```
+
+
+
+
+
+```{r, message = FALSE, warning = FALSE}
+knn.m1 <- train(
+  Attrition ~ .,
+  data = train,
+  method = "knn"
+  )
+
+predictions_knn <- predict(knn.m1, test)
+
+# Testing Results
+conf_matrix_knn <- confusionMatrix(predictions_knn, actuals)
 ```
 
 ```{r, message = FALSE, warning = FALSE}
-
-varImp(nb.m1)
-
-```
-
-
-```{r, message = FALSE, warning = FALSE}
-
-new_features <- c("Age", "JobLevel", "MonthlyIncome")
-
-x <- train[, new_features]
-y <- train$Attrition
-
-nb.m2 <- train(
-  x = x,
-  y = y,
-  method = "naive_bayes"
+svm.m1 <- train(
+  Attrition ~.,
+  data = train,
+  method = "svmLinear"
   )
+
+# Testing Results
+predictions_svm <- predict(svm.m1, test)
+
+# Testing Results
+conf_matrix_svm <- confusionMatrix(predictions_svm, actuals)
 ```
-
-
-
-
