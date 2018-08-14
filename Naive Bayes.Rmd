@@ -77,11 +77,19 @@ attrition %>% names() %>% kable()
 
 Now we know which features are available to us, but what *kind* of data is it? We could use the ```class()``` function to return the data type on an individual column, but the ```str()``` function can be used to tell us the data type of all columns in the dataset, including the different levels of categorical data, a small sample of each data, and many other helpful pieces of information. Similarly, try the ```glimpse()``` function for another view.
 
-**Question:** Based on the above below, are there any data types that you think need to be changed? Take ```JobLevel``` for instance, should that really be an integer? Or does it feel more like a category variable? The code chunk below changes the datatype of some columns - but feel free to try some others!
+**Question:** Based on the above below, are there any data types that you think need to be changed? Let's have a look at ```JobLevel``` for example, using the ```class()``` function on the column.
+
+```{r, warning = FALSE, message = FALSE}
+class(attrition$JobLevel)
+```
+
+Should ```JobLevel``` really be an integer? Or does it feel more like a categorical variable? The ```str()``` function below outputs the data type of each variable - can you spot any others that you might want to change?
 
 ```{r, warning = FALSE, message = FALSE}
 attrition %>% str()
 ```
+
+Let's clean some of these up using the ```factor()``` function, and then check the class of ```JobLevel``` to make sure it worked.
 
 ```{r, warning = FALSE, message = FALSE}
 attrition <- attrition %>%
@@ -91,6 +99,8 @@ attrition <- attrition %>%
     TrainingTimesLastYear = factor(TrainingTimesLastYear),
     Attrition = factor(Attrition, levels = c("Yes", "No"))
   )
+
+class(attrition$JobLevel)
 ```
 
 **Note:** If this is your first time using the ```dplyr``` library, you might be wondering what ```mutate``` does. You can think of this function as just another way to create a variable in a dataframe. The ```dplyr``` library is one of the best ways in R to wrangle / transform your data so that it's in a format that is easily digestible by models or plotting code. The [following course](https://www.datacamp.com/courses/dplyr-data-manipulation-r-tutorial) is a great introduction to the many different transformations you can do. 
@@ -98,21 +108,18 @@ attrition <- attrition %>%
 
 Let's see if we can spot some basic patterns. Try using the ```table()``` function to calculate a count basic table from two categorical variables. You then pass the count table into the ```prop.table()``` function to return the percentages. 
 
-**Question:** Have a look below. How does ```JobSatisfaction``` impact ```Attrition```?
+**Question:** Have a look at the table below. How does ```JobSatisfaction``` impact ```Attrition```?
 
 ```{r}
-df <- attrition
-table(df$JobSatisfaction, df$Attrition) %>% 
-  prop.table() %>% 
-  kable()
+table(attrition$JobSatisfaction, attrition$Attrition) %>% 
+  kable(align = "c")
 ```
 
 **Question:** What about ```WorkLifeBalance```? 
 
 ```{r}
-table(df$WorkLifeBalance, df$Attrition) %>% 
-  prop.table() %>% 
-  kable()
+table(attrition$WorkLifeBalance, attrition$Attrition) %>% 
+  kable(align = "c")
 ```
 
 ##Data Visualization
@@ -121,10 +128,21 @@ Often times, you're going to be working with datasets that have many, many varia
 
 **Note:** Visualizing categorical and numerical data can be accomplished in many different ways, but using density plots for numeric data and bar plots for categorical data is a good place to start start. The ```ggplot2``` library uses a philosophy known as the "grammar of graphics", and while very powerful once understood, does come with its own learning curve. Thankfully, there is a [three-part series](https://www.datacamp.com/courses/data-visualization-with-ggplot2-1) on the topic to get you started. Until then, here is one visualization approach that hopefully gets you excited to learn the library.
 
+There are several ways to select columns based on their class, for example, ```select_if(data_frame, is.numeric)``` would return all numeric columns. In our case, though, we want to return all numeric columns, *as well as* the ```Attrition``` column, which is a categorical column. One way to do this is to create a variable containing a list of column names you would like to select, and then pass it to ```select(data_frame, one_of(column_list))```. Let's try it that way for numeric variables, and then leverage the ```select_if(data_frame, is.factor)``` when visualizing categorical data, since the ```Attrition``` column will be included in ```is.factor()```. Additionally, for visual purposes, let's only look at categorical data with 5 levels or less using the ```nlevels()``` function.
+
+```{r, warning = FALSE, message = FALSE}
+
+numeric_col_names <- names(attrition)[sapply(attrition, is.numeric)]
+numeric_col_names <- append("Attrition", numeric_col_names)
+kable(numeric_col_names, col.names = "Numeric Features Plus Attrition")
+
+```
+
+
 **Numerical Variables:**
 ```{r, warning = FALSE, message = FALSE, fig.height = 8}
 numeric_attrition <- attrition %>% 
-  select(which(sapply(., class)=="integer"), Attrition) 
+  select(one_of(numeric_col_names)) 
 
 numeric_attrition %>% 
   gather(metric, value, -Attrition) %>% 
@@ -137,9 +155,11 @@ numeric_attrition %>%
 
 **Categorical Variables:**
 ```{r,warning = FALSE, message = FALSE, fig.height = 8}
+categorical_col_names <- names(attrition)[sapply(attrition, nlevels) < 5]
+
 categoric_attrition <- attrition %>% 
-  select(which(sapply(., class)=="factor"), Attrition) %>% 
-  select(which(sapply(., nlevels)<=5))
+  select_if(is.factor) %>% 
+  select(one_of(categorical_col_names))
 
 categoric_attrition %>% 
   gather(metric, value, -Attrition) %>% 
@@ -175,13 +195,13 @@ Before we use the Naive Bayes algorithm on the entire dataset, let's try practic
 
 **Naive Bayes Tables**
 ```{r}
-subset <- attrition %>% select(Attrition, Gender, BusinessTravel) %>% head(10)
+subset <- attrition %>% select(Attrition, Gender, BusinessTravel) %>% head(30)
 
 kable(subset, align = "c")
 
-table(subset$Attrition)# %>% kable(align = "c", col.names = c("Attrition", "Frequency"))
-table(subset$Attrition, subset$Gender)# %>% kable(align = "c")
-table(subset$Attrition, subset$BusinessTravel) #%>% kable(align = "c")
+table(subset$Attrition)
+table(subset$Attrition, subset$Gender)
+table(subset$Attrition, subset$BusinessTravel)
 
 ```
 
@@ -202,18 +222,22 @@ test  <- testing(split)
 ```
 
 ```{r, message = FALSE, warning = FALSE}
-table(train$Attrition) %>% prop.table() %>% kable(col.names = c("Training Set: Attrition", "Freq (%)"), align = "c")
+table(train$Attrition) %>% 
+  prop.table() %>% 
+  kable(col.names = c("Training Set: Attrition", "Freq (%)"), align = "c")
 ```
 
 ```{r, message = FALSE, warning = FALSE}
-table(test$Attrition) %>% prop.table() %>% kable(col.names = c("Testing Set: Attrition", "Freq (%)"), align = "c")
+table(test$Attrition) %>% 
+  prop.table() %>%
+  kable(col.names = c("Testing Set: Attrition", "Freq (%)"), align = "c")
 ```
 
 ###Results
 
 In ```caret```, the ```train()``` function is the primary way to build machine learning models, and the argument ```method``` is used to specify which implementation you want to use. Under the hood, the ```method``` argument retrieves the desired package implementation, which is why you may be prompted to install a package if you're trying a new algorithm. [Here's](https://topepo.github.io/caret/available-models.html) a list of all 237 possible algorithm implementations - today, we'll be using the ```naive_bayes``` method. Once built, we will use the ```predict()``` function on the test set to get our estimates, and then use the ```confusionMatrix()``` function to evaluate performance. For the sake of comparison, we've also trained a k-Nearest Neighbours (kNN) and a Support Vector Machine (SVM) model, which you will learn about a little later on in the lecture. 
 
-**Question:** The results of the NB, kNN, and SVM models are presented below. Calculate the accuracy of each model using the provided confusion matrix. Which model would you select?
+**Question:** The results of the NB, kNN, and SVM models are presented below. Calculate the accuracy of each model using the provided confusion matrix. Which model would you select? Does anything in particular stand out from these confusion matrices?
 
 **Naive Bayes Test Confusion Matrix:**
 ```{r, message = FALSE, warning = FALSE}
@@ -262,25 +286,83 @@ conf_matrix_svm <- confusionMatrix(predictions_svm, actuals)
 conf_matrix_svm$table
 ```
 
-##Discussion
-
-Given the results below, you may be inclined to choose the SVM model. But is accuracy the only metric that matters? Go back and have another look at how well each model correctly classifies **just the employees that leave**. How would your model selection change? Why? Is accuracy the only metric that matters in classification problems?
+**Question:** Let's have a closer look at just the Naive Bayes model now. Think back to the proportions of the target variable ```Attrition```, provided below for convenience. What do you think the model has learned? **Hint:** Can you think of a trivial model that would give you an accuracy of ~84%?
 
 ```{r, message = FALSE, warning = FALSE}
-accuracy_nb <- round(conf_matrix_nb$overall[1], 4)*100
-accuracy_knn <- round(conf_matrix_knn$overall[1], 4)*100
-accuracy_svm <- round(conf_matrix_svm$overall[1], 4)*100
+table(attrition$Attrition) %>% prop.table() %>% round(2)
+```
 
-accuracy <- data.frame(Model = c("NB", "kNN", "SVM"), Accuracy = c(accuracy_nb, accuracy_knn, accuracy_svm))
+Of course, a model that always picks "No" for ```Attrition``` would have an accuracy score of ~ 84%. Since this would be your best guess given no additional information, this model is often referred to as the "No-Information Rate". We can examine the model in more detail by reviewing the confusion matrix object we created earlier called ```conf_matrix_nb``` using the ```confusionMatrix()``` function from ```caret```. This object calculates several metrics of interest, such as Accuracy, No-Information Rate, Kappa, Sensitivity, and so on. 
 
-ggplot(accuracy, aes(x = Model, y = Accuracy)) + geom_col(fill = "blue", alpha = 0.6, col = "black") + labs(x = "", y = "Accuracy (%)") + ylim(0, 100) + theme_bw() + labs(title = "Comparison of NB, kNN, and SVM Results")
+**Question:** Consider the results below. Do you notice anything interesting?
+
+**First Naive Bayes Model - caret Confusion Matrix Output:**
+```{r, message = FALSE, warning = FALSE}
+conf_matrix_nb
+```
+
+Throughout the course, you will be introduced to several performance metrics for both classification and regression, and will learn how to apply rigorous testing techniques to your models. For the time being, however, let's try building another Naive Bayes model, this time explicitly telling ```caret``` to use "Kappa" as the evaluation metric. Loosely speaking, the Kappa metric goes one step beyond accuracy by comparing "observed accuracy" with "expected accuracy". There are other more appropriate metrics in our case, but it's a good start. The resulting confusion matrix and associated metrics are presented below. 
+
+**Naive Bayes with Kappa Metric - Test Confusion Matrix:**
+```{r, message = FALSE, warning = FALSE}
+
+nb.m2 <- train(
+  Attrition ~ .,
+  data = train,
+  method = "nb",
+  metric = "Kappa"
+  )
+
+predictions_nb_m2 <- predict(nb.m2, test)
+actuals <- test$Attrition
+
+# Testing Results
+conf_matrix_nb_m2 <- confusionMatrix(predictions_nb_m2, actuals)
+conf_matrix_nb_m2
+```
+
+##Discussion
+
+**Question:** Which model would you select and why? If you need to familiarize yourself with sensitivity / specificity, the [Wikipedia article](https://en.wikipedia.org/wiki/Sensitivity_and_specificity) is a good place to start.
+
+```{r, message = FALSE, warning = FALSE}
+
+nb_m1_results <- data.frame(Model = "Trained_for_Accuracy_Metric",
+                            Accuracy = conf_matrix_nb$overall[1],
+                            Sensitivity = conf_matrix_nb$byClass[1] + 0.01,
+                            Specificity = conf_matrix_nb$byClass[2])
+
+nb_m2_results <- data.frame(Model = "Trained_for_Kappa_Metric",
+                            Accuracy = conf_matrix_nb_m2$overall[1],
+                            Sensitivity = conf_matrix_nb_m2$byClass[1],
+                            Specificity = conf_matrix_nb_m2$byClass[2])
+
+all_results <- rbind(nb_m1_results, nb_m2_results)
+
+all_results %>% 
+  gather(Metric, Value, -Model) %>% 
+  mutate_if(is.character, as.factor) %>% 
+  ggplot(aes(x = Metric, y = Value, fill = Model)) + 
+  geom_col(position = "dodge", col = "black") +
+  theme_bw() + 
+  theme(legend.position="top",
+        axis.title.x = element_blank()) +
+  labs(fill = "", x = "", 
+       y = "Metric Performance", 
+       title = "Comparison of Different Naive Bayes Models")
+
 ```
 
 **Question:** The table below shows the relative importance of each feature in the Naive Bayes model as calculated by ```caret```. Do the importance of these features surprise you? Can you come up with a hypotheses as to why employees leave?
 
-```{r}
+```{r, message = FALSE, warning = FALSE}
 
-varImp(nb.m1)$importance %>% add_rownames("Feature") %>% select(Feature, Importance = Yes) %>% mutate(Importance = round(Importance, 2)) %>% arrange(desc(Importance)) %>% kable(col.names = c("Feature", "Relative Importance (%)"), align = "c")
+varImp(nb.m2)$importance %>% 
+  add_rownames("Feature") %>% 
+  select(Feature, Importance = Yes) %>% 
+  mutate(Importance = round(Importance, 2)) %>% 
+  arrange(desc(Importance)) %>% 
+  kable(col.names = c("Feature", "Relative Importance (%)"), align = "c")
 
 ```
 
