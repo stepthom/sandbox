@@ -220,3 +220,18 @@ df[4,1] = "the man had feet"
 vs <- VectorSource(df[,1])
 c <- SimpleCorpus(vs)
 ```
+
+
+```{r}
+df = data.frame(replicate(4,sample(0:1,5,rep=TRUE)))
+df[1,] = c(0, 1, 1, 0)
+df[2,] = c(0, 1, 0, 1)
+df[3,] = c(1, 2, 1, 0)
+df[4,] = c(1, 0, 1, 0)
+df[5,] = c(0, 2, 1, 1)
+df
+
+pca = princomp(df, scale = TRUE)
+pca$scores
+
+```

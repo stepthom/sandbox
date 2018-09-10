@@ -1,0 +1,55 @@
+---
+title: "SimpleNN"
+output: html_document
+---
+
+
+
+```{r cars}
+## Creating index variable 
+
+# Read the Data
+data = read.csv("data/cereals.csv", header=T)
+
+# Random sampling
+samplesize = 0.60 * nrow(data)
+set.seed(80)
+index = sample( seq_len ( nrow ( data ) ), size = samplesize )
+
+```
+
+```{r}
+## Scale data for neural network
+
+max = apply(data , 2 , max)
+min = apply(data, 2 , min)
+scaled = as.data.frame(scale(data, center = min, scale = max - min))
+scaled
+```
+
+```{r}
+# load library
+library(neuralnet)
+
+# creating training and test set
+trainNN = scaled[index , ]
+testNN = scaled[-index , ]
+
+head(trainNN)
+
+# fit neural network
+set.seed(2)
+NN = neuralnet(rating ~ calories + fat, trainNN, hidden = c(5,5,5) , linear.output = T )
+
+str(NN)
+
+# plot neural network
+plot(NN, rep="best")
+plotnet(NN)
+```
+
+```{r}
+NN$weights
+newdata = t(c(0.7, 0.4)) # truth rating .36
+compute(NN, newdata)
+```

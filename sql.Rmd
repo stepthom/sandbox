@@ -5,17 +5,38 @@ output: html_notebook: default
 
 
 ```{r}
+
 library(tidyverse)
 library(sqldf)
+
 ```
 ```{r}
 customer = read.csv("customer.csv", header=TRUE)
 trans = read.csv("transaction.csv", header=TRUE)
+trans
+
+# tmp - to be like the slides
+customer = customer %>%
+  filter(id %in% c(1001, 1002, 1004))
+
+trans = trans %>%
+  filter(id %in% c(1, 2, 4, 5))
+
+trans[3, ]$customer_id = 1002
+trans[4, ]$customer_id = 1003
 ```
 ```{r}
 sqldf("select * from customer")
+```
+
+```{r}
+sqldf("select * from trans")
+```
 
 
+```{r}
+
+sqldf("select * from trans join customer on trans.customer_id = customer.id")
  
 ```
 

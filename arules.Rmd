@@ -7,9 +7,6 @@ output:
 
 ```{r}
 library(arules)
-data("Groceries")
-inspect(Groceries[1:20,])
-
 library(arulesViz)
 ```
 
@@ -100,8 +97,12 @@ inspect(head(rules, n=40, by = "conviction"))
 ```
 
 ```{r}
-subrules <- rules[quality(rules)$confidence > 0.8]
-plot(subrules)
+
+# First, just plot them all:
+# Note that the windows() call makes a new window pop up, which is what we want for interactivity.
+windows(); plot(rules, interactive = T)
+
+subrules <- rules[quality(rules)$confidence > 0.3]
 plot(subrules, method="matrix", measure="lift")
 plot(subrules, method="matrix3D", measure="lift")
 plot(subrules, method="graph", measure="lift")
