@@ -1,0 +1,111 @@
+---
+title: "Data for slides"
+author: "Dr. Stephen W. Thomas, Queen's University"
+date: "2018"
+output:
+  pdf_document:
+    highlight: pygments
+    number_sections: yes
+    toc: no
+    toc_depth: '2'
+---
+
+
+
+```{r}
+library(tidyr)
+library(dplyr)
+library(readr)
+library(tm)
+library(qdap)
+library(ngram)
+```
+
+# Tokenization
+
+```{r}
+tokenizers::tokenize_words("Where are you today?")
+```
+
+
+# Case Normalization
+
+```{r}
+tolower("How are you?")
+```
+
+
+
+# N-Grams
+
+```{r}
+ng = ngram::ngram("Hey there, I'm awesome.", n=2)
+print(ng, output="full")
+
+```
+
+
+
+# Removing Characters
+
+```{r}
+# Removing punctuation
+tm::removePunctuation("Hey! Let's go to the bar...")
+
+# Removing special characters
+astr <- "Ábcdêãçoàúü"
+iconv(astr, to = "ASCII//TRANSLIT")
+```
+
+
+# Removing Numbers
+
+```{r}
+tm::removeNumbers("There are only 4 classes left.")
+
+```
+
+
+
+# Stemming
+
+```{r}
+qdap::stemmer("We are writing code like hackers.", capitalize = FALSE)
+```
+
+
+# Spell Checking
+
+```{r}
+qdap::check_spelling("This is not spelld correcly.")
+```
+
+
+# Stopping
+
+```{r}
+qdap::rm_stop("My name is Steve, and I am a good chef.", stopwords = qdapDictionaries::Top200Words)
+```
+
+
+# Removing Rare Words
+
+```{r}
+myText <- c("the quick brown furry fox jumped over a second furry brown fox",
+              "the sparse brown furry matrix",
+              "the quick matrix")
+
+require(tm)
+myVCorpus <- VCorpus(VectorSource(myText))
+myTdm <- DocumentTermMatrix(myVCorpus)
+as.matrix(myTdm)
+as.matrix(removeSparseTerms(myTdm, .01))
+as.matrix(removeSparseTerms(myTdm, .99))
+as.matrix(removeSparseTerms(myTdm, .5))
+
+   
+require(quanteda)
+myDfm <- dfm(myText, verbose = FALSE)
+docfreq(myDfm)
+trim(myDfm, minDoc = 2)
+```
