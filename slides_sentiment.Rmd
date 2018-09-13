@@ -1,7 +1,7 @@
 ---
 title: "Data for slides"
 author: "Dr. Stephen W. Thomas, Queen's University"
-date: "2017"
+date: "2018"
 output:
   pdf_document:
     highlight: pygments
@@ -13,51 +13,209 @@ output:
 
 
 ```{r}
-library(tidytext)
 library(tidyr)
 library(dplyr)
-library(ggplot2)
 library(readr)
-library(tm)
 ```
 
-```{r}
-
-lexicon = data_frame(
-  word=c("monstrosity", "hate", "disgust", "sham", "inspire", "beautiful", "like", "relish", "masterpiece"),
-  score=c(-5, -4, -3, -2, 1, 2, 3, 4, 5))
-
-lexicon
-```
-
+# Data
 
 ```{r}
-df = data_frame(doc_id=c(231,232, 233, 234), 
-                  text=c("I really like princess elsa. she's so beautiful!",
-                         "I hate Tom Cruise. He disgusts me.",
-                         "Nobody gives a good performance in this movie.",
-                         "I really enjoyed the film")
+sentences = c(
+  'I am happy.',
+  'I am very happy.',
+  'I am not very happy.',
+  'I love cheese but I hate wine.',
+  'Nobody gives a good performance.',
+  'She is sleazy.',
+  'She is slightly sleazy.',
+  'GOING TO LA THIS WEEKEND.',
+  'The boy is not mad.',
+  'The boy is not not mad.',
+  'Princess Elsa is a beautiful person to me.',
+  'Princess Elsa is not a beautiful person to me.',
+  'Princess Elsa is a very beautiful person to me.',
+  'Princess Elsa is not a very beautiful person to me.',
+  'I love being ignored.'
 )
-df
 ```
 
+The results data frame.
+
 ```{r}
+res = data.frame(sentence = character(), meth = character(), sentiment=numeric())
+```
+
+# QDAP
+
+```{r}
+library(qdap)
+
+res1 = data.frame(sentence = character(), meth = character(), sentiment=numeric())
+for (s in sentences){
+  p = polarity(s, n.before=4, n.after=2)
+  res1 = rbind(res1, data.frame(sentence=s, meth="qdap", sentiment=p$all$polarity))
+  #p = polarity(s, n.before=2, n.after=2)
+  #res = rbind(res, data.frame(sentence=s, meth="qdap 2/2", sentiment=p$all$polarity))
+  #p = polarity(s, n.before=2, n.after=4)
+  #res = rbind(res, data.frame(sentence=s, meth="qdap 2/4", sentiment=p$all$polarity))
+  #p = polarity(s, n.before=4, n.after=4)
+  #res = rbind(res, data.frame(sentence=s, meth="qdap 4/4", sentiment=p$all$polarity))
+  #p = polarity(s, n.before=6, n.after=4)
+  #res = rbind(res, data.frame(sentence=s, meth="qdap 6/4", sentiment=p$all$polarity))
+}
+res1
+
+#qdapDictionaries::amplification.words
+#polarity("cheese great")
+#polarity("barely great")
+
+res = rbind(res, res1)
+res1
+
+```
+
+# Syuzhet
+
+
+```{r}
+library(syuzhet)
+
+
+res1 = data.frame(sentence = character(), meth = character(), sentiment=numeric())
+for (s in sentences){
+  res1 = rbind(res1, data.frame(sentence=s, meth="syuzhet", sentiment=syuzhet::get_sentiment(s)))
+  #res1 = rbind(res1, data.frame(sentence=s, meth="syuzhet, bing", sentiment=syuzhet::get_sentiment(s, method="bing")))
+  #res1 = rbind(res1, data.frame(sentence=s, meth="syuzhet, afinn", sentiment=syuzhet::get_sentiment(s, method="afinn")))
+  #res1 = rbind(res1, data.frame(sentence=s, meth="syuzhet, nrc", sentiment=syuzhet::get_sentiment(s, method="nrc")))
+}
+
+res = rbind(res, res1)
+res1
+```
+
+# SentimentAnalysis
+
+```{r}
+library(SentimentAnalysis)
+
+
+res1 = data.frame(sentence = character(), meth = character(), sentiment=numeric())
+for (s in sentences){
+  res1 = rbind(res1, data.frame(sentence=s, meth="SentimentAnalysis", sentiment=SentimentAnalysis::analyzeSentiment(s)$SentimentGI))
+}
+
+
+res = rbind(res, res1)
+res1
+```
+
+# RSentiment
+
+```{r}
+library(RSentiment)
+
+
+res1 = data.frame(sentence = character(), meth = character(), sentiment=numeric())
+for (s in sentences){
+  res1 = rbind(res1, data.frame(sentence=s, meth="RSentiment", sentiment=RSentiment::calculate_sentiment(s)$sentiment))
+}
+
+
+res = rbind(res, res1)
+res1
+```
+
+# Tidy
+
+```{r}
+library(tidytext)
+
+df = data_frame(text=sentences) %>%
+  mutate(docid = row_number())
+
+
 tidy <- df %>% 
-  filter(doc_id==231) %>%
   unnest_tokens(word, text)
-tidy
+
+res1 = tidy %>%
+  inner_join(get_sentiments("afinn"), by=c("word")) %>%
+  group_by(docid) %>%
+  summarise(sentiment=sum(score)) %>%
+  inner_join(df, by=c("docid")) %>%
+  mutate(sentence=text) %>%
+  mutate(meth="tidy") %>%
+  select(sentence, meth, sentiment)
+
+res = rbind(res, res1)
+res1
+```
+
+
+# sentimentr
+
+```{r}
+library(sentimentr)
+
+
+res1 = data.frame(sentence = character(), meth = character(), sentiment=numeric())
+for (s in sentences){
+  res1 = rbind(res1, data.frame(sentence=s, meth="sentimentr", sentiment=sentimentr::sentiment(s)$sentiment))
+}
+
+
+res = rbind(res, res1)
+res1
 ```
 
 
 
-```{r}
-tidy %>%
-  inner_join(lexicon, by=c("word"))
-```
+# Azure
+
+Gathered Sept 11, 2018: https://azure.microsoft.com/en-us/services/cognitive-services/text-analytics/
 
 ```{r}
-tidy %>%
-  inner_join(lexicon, by=c("word")) %>%
-  group_by(doc_id) %>%
-  summarise(sentiment_score=sum(score))
-````
+res1 = data.frame(sentence = character(), meth = character(), sentiment=numeric())
+
+res1 = res1 %>%
+  add_row(sentence='I am happy.', meth="Azure", sentiment=1) %>%
+  add_row(sentence='I am very happy.', meth="Azure", sentiment=1) %>%
+  add_row(sentence='I am not very happy.', meth="Azure", sentiment=.01) %>%
+  add_row(sentence='I love cheese but I hate wine.', meth="Azure", sentiment=.15) %>%
+  add_row(sentence='Nobody gives a good performance.', meth="Azure", sentiment=.87) %>%
+  add_row(sentence='She is sleazy.', meth="Azure", sentiment=.76) %>%
+  add_row(sentence='She is slightly sleazy.', meth="Azure", sentiment=.76) %>%
+  add_row(sentence='GOING TO LA THIS WEEKEND.', meth="Azure", sentiment=.85) %>%
+  add_row(sentence='The boy is not mad.', meth="Azure", sentiment=.99) %>%
+  add_row(sentence='The boy is not not mad.', meth="Azure", sentiment=.26) %>%
+  add_row(sentence='Princess Elsa is a beautiful person to me.', meth="Azure", sentiment=.92) %>%
+  add_row(sentence='Princess Elsa is not a beautiful person to me.', meth="Azure", sentiment=.14) %>%
+  add_row(sentence='Princess Elsa is a very beautiful person to me.', meth="Azure", sentiment=.92) %>%
+  add_row(sentence='Princess Elsa is not a very beautiful person to me.', meth="Azure", sentiment=.14) %>%
+  add_row(sentence='I love being ignored.', meth="Azure", sentiment=.81)
+  
+res = rbind(res, res1)
+res1
+```
+
+
+# Comparison
+
+```{r}
+comparison = res %>%
+  spread(meth, sentiment)
+comparison
+```
+
+
+# Emotions
+
+
+```{r}
+library(syuzhet)
+
+s ='I am actually very happy today.'
+emo=syuzhet::get_nrc_sentiment(sentences)
+emo = cbind(sentences, emo)
+emo
+```
