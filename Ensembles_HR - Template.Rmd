@@ -1,0 +1,46 @@
+---
+title: "Illustrating Ensemble Models - Employee Attrition"
+output: 
+  html_document:
+      toc: yes
+      toc_float: yes
+      code_folding: hide
+---
+
+Given the potential disruption to the work environment and the required resources to attract, acquire, and train new talent, understanding factors that influence employee attrition is important to human resource departments. In this exercise, we'll explore the IBM Human Resources Analytics dataset, which contains data on employee attrition (whether an employee will leave the company).  Throughout this exercise,
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r, warning = FALSE, message = FALSE}
+library(tidyverse)
+library(MLmetrics)
+library(rsample) # contains the IBM attrition data set
+```
+
+
+```{r}
+# Helper function to print the confusion matrix and other performance metrics of the models.
+printPerformance = function(pred, actual, positive="Yes") {
+  print(table(actual, pred))
+  print("")
+  
+  print(sprintf("Accuracy:    %.3f", Accuracy(y_true=actual, y_pred=pred)))
+  print(sprintf("Precision:   %.3f", Precision(y_true=actual, y_pred=pred, positive=positive)))
+  print(sprintf("Recall:      %.3f", Recall(y_true=actual, y_pred=pred, positive=positive)))
+  print(sprintf("F1 Score:    %.3f", F1_Score(pred, actual, positive=positive)))
+  print(sprintf("Sensitivity: %.3f", Sensitivity(y_true=actual, y_pred=pred, positive=positive)))
+  print(sprintf("Specificity: %.3f", Specificity(y_true=actual, y_pred=pred, positive=positive)))
+}
+```
+
+# Read in the data
+
+```{r}
+df <- attrition 
+df = df %>% 
+  mutate_if(is.character, as.factor)
+head(df)
+summary(df)
+```

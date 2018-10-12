@@ -1,0 +1,152 @@
+---
+title: "Clustering"
+author: "Dr. Stephen W. Thomas, Queen's University"
+output:
+  pdf_document:
+    highlight: pygments
+    number_sections: yes
+    toc: no
+    toc_depth: '2'
+---
+
+
+
+```{r}
+library(dplyr)
+library(ggplot2)
+library(readr)
+library(extrafont)
+library(ggthemes)
+loadfonts(quiet = T)
+```
+
+# Load Data
+
+```{r}
+dat <- read_csv("data/Mall_Customers_With_output.csv")
+str(dat)
+head(dat)
+```
+```{r}
+plotClust = function(df, colorCol) {
+  ggplot(df, aes(x=AnnualIncome, y=SpendingScore)) + 
+  geom_point(aes(color=factor(colorCol)), size=4) +
+  geom_rangeframe() + 
+  theme_tufte(base_family="Calibri") + 
+  theme(legend.position="none") + 
+  theme(axis.title.x = element_text(colour="grey20",size=40,face="plain")) + 
+  theme(axis.title.y = element_text(colour="grey20",size=40,face="plain")) + 
+  theme(axis.text.x = element_text(colour="grey20",size=32,face="plain")) + 
+  theme(axis.text.y = element_text(colour="grey20",size=32,face="plain")) +
+  labs(x = "Annual Income (K)", y ="Spending Score") 
+  
+}
+```
+
+# Plot the data
+
+```{r}
+iwidth = 10
+iheight = 7
+
+theme_set(theme_gray(base_size = 32))
+
+
+ggplot(dat, aes(x=AnnualIncome, y=SpendingScore)) + 
+  geom_point(color="black", size=10) +
+  geom_rangeframe() + 
+  theme_tufte(base_family="Calibri") + 
+  theme(legend.position="none") + 
+  theme(axis.title.x = element_text(colour="grey20",size=40,face="plain")) + 
+  theme(axis.title.y = element_text(colour="grey20",size=40,face="plain")) + 
+  theme(axis.text.x = element_text(colour="grey20",size=32,face="plain")) + 
+  theme(axis.text.y = element_text(colour="grey20",size=32,face="plain")) +
+  labs(x = "Annual Income (K)", y ="Spending Score") 
+  
+#ggsave(file="out/cluster_1.png", width=iwidth, height=iheight)
+
+```
+
+# Scaling the data
+
+```{r}
+
+
+```
+
+
+# K-means
+
+
+```{r}
+set.seed(123)
+
+clusters = kmeans(dat[,4:5], centers=5, nstart=10)
+dat$kmeans1 = clusters$cluster
+plotClust(dat, clusters$cluster)
+
+clusters = kmeans(dat[,4:5], centers=2, nstart=10)
+plotClust(dat, clusters$cluster)
+
+clusters = kmeans(dat[,4:5], centers=10, nstart=10)
+plotClust(dat, clusters$cluster)
+
+#ggsave(file="out/cluster_kmeans1.png", width=iwidth, height=iheight)
+```
+
+
+# DBSCAN
+
+
+```{r}
+library(dbscan)
+set.seed(123)
+
+kNNdistplot(dat[,4:5], k = 3)
+
+clusters = dbscan(dat[,4:5], minPts = 3, eps = 11)
+clusters
+dat$dbscan1 = clusters$cluster
+dat$dbscan1
+
+pairs(dat[,4:5], col=clusters$cluster + 1L)
+
+ggplot(dat, aes(x=AnnualIncome, y=SpendingScore)) + 
+  geom_point(aes(color=factor(dbscan1)), size=4) +
+  geom_rangeframe() + 
+  theme_tufte(base_family="Calibri") + 
+  theme(axis.title.x = element_text(colour="grey20",size=40,face="plain")) + 
+  theme(axis.title.y = element_text(colour="grey20",size=40,face="plain")) + 
+  theme(axis.text.x = element_text(colour="grey20",size=32,face="plain")) + 
+  theme(axis.text.y = element_text(colour="grey20",size=32,face="plain")) +
+  labs(x = "Annual Income (K)", y ="Spending Score") 
+
+#ggsave(file="out/cluster_kmeans1.png", width=iwidth, height=iheight)
+```
+
+
+# Hierarchical
+
+
+```{r}
+
+set.seed(123)
+
+clusters = hclust(dist(dat[,4:5])) 
+clusters
+plot(clusters)
+dat$hclust1 = cutree(clusters, 5)
+dat$hclust1
+
+ggplot(dat, aes(x=AnnualIncome, y=SpendingScore)) + 
+  geom_point(aes(color=factor(hclust1)), size=4) +
+  geom_rangeframe() + 
+  theme_tufte(base_family="Calibri") + 
+  theme(axis.title.x = element_text(colour="grey20",size=40,face="plain")) + 
+  theme(axis.title.y = element_text(colour="grey20",size=40,face="plain")) + 
+  theme(axis.text.x = element_text(colour="grey20",size=32,face="plain")) + 
+  theme(axis.text.y = element_text(colour="grey20",size=32,face="plain")) +
+  labs(x = "Annual Income (K)", y ="Spending Score") 
+
+#ggsave(file="out/cluster_kmeans1.png", width=iwidth, height=iheight)
+```

@@ -1,0 +1,224 @@
+---
+title: "Feature Engineering German Credit"
+output: 
+  html_document:
+      toc: yes
+      toc_float: yes
+      code_folding: hide
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r}
+library(dplyr)
+library(caret)
+library(rpart)
+library(rpart.plot)
+```
+
+
+```{r}
+# Helper function to print the confusion matrix and other performance metrics of the models.
+printPerformance = function(pred, actual, positive="Yes") {
+  print(caret::confusionMatrix(data=pred, reference=actual, positive=positive, dnn=c("Predicted", "Actual")))
+}
+```
+
+# Load Data
+
+```{r}
+data(GermanCredit, package = "caret")
+df = GermanCredit
+df$Class = as.character(df$Class)
+df$Class[df$Class == "Bad"] = "NotGood" 
+df$Class = as.factor(df$Class)
+df.orig = df
+str(df)
+head(df)
+table(df$Class)
+```
+
+# Feature Engineering
+
+```{r}
+p1 <- preProcess(df['Amount'], 'center')
+p2 <- preProcess(df['Amount'], c('center', 'scale'))
+p3 <- preProcess(df['Amount'], 'range')
+p4 <- preProcess(df['Amount'], 'YeoJohnson')
+p5 <- preProcess(df['Amount'], 'BoxCox')
+
+df['Amount.center'] = predict(p1, df['Amount'])
+df['Amount.standardization'] = predict(p2, df['Amount'])
+df['Amount.range'] = predict(p3, df['Amount'])
+df['Amount.YeoJohnson'] = predict(p4, df['Amount'])
+df['Amount.BoxCox'] = predict(p5, df['Amount'])
+
+iwidth = 5
+iheight = 3
+
+df %>% ggplot(aes(x=Amount)) + 
+ geom_histogram(colour="black", fill="white") + 
+ xlab("Amount (original)")
+
+ggsave(file="out/gc_amount_1.png", width=iwidth, height=iheight)
+
+df %>% ggplot(aes(x=Amount.range)) + 
+ geom_histogram(colour="black", fill="white") + 
+ xlab("Amount (range)")
+
+ggsave(file="out/gc_amount_2.png", width=iwidth, height=iheight)
+
+df %>% ggplot(aes(x=Amount.center)) + 
+ geom_histogram(colour="black", fill="white") + 
+ xlab("Amount (center)")
+
+ggsave(file="out/gc_amount_3.png", width=iwidth, height=iheight)
+
+df %>% ggplot(aes(x=Amount.standardization)) + 
+ geom_histogram(colour="black", fill="white") + 
+ xlab("Amount (standarization)")
+
+ggsave(file="out/gc_amount_4.png", width=iwidth, height=iheight)
+
+df %>% ggplot(aes(x=Amount.YeoJohnson)) + 
+ geom_histogram(colour="black", fill="white") + 
+ xlab("Amount (YeoJohnson)")
+
+ggsave(file="out/gc_amount_5.png", width=iwidth, height=iheight)
+
+df %>% ggplot(aes(x=Amount.BoxCox)) + 
+ geom_histogram(colour="black", fill="white") + 
+ xlab("Amount (BoxCox)")
+
+ggsave(file="out/gc_amount_6.png", width=iwidth, height=iheight)
+
+```
+
+# Splitting the Data
+
+```{r}
+df = df.orig
+set.seed(123) # Set the seed to make it reproducible
+
+train.index <- createDataPartition(df$Class, p = .8, list = FALSE)
+train <- df[ train.index,]
+test  <- df[-train.index,]
+
+# Double check that the stratefied sampling worked
+table(df$Class)/nrow(df)
+table(train$Class)/nrow(train)
+table(test$Class)/nrow(test)
+
+actual = test$Class
+formula = Class ~ .
+positive = "Good"
+```
+
+
+
+# Evaluation
+
+```{r}
+# Function to show the confusion matrix and resulting tree
+showResults = function(model){
+  pred = predict(model, test)
+  print(caret::confusionMatrix(data=pred, reference=actual, positive=positive, dnn=c("Predicted", "Actual")))
+  #rpart.plot(model$finalModel, extra=2, type=2)
+}
+```
+
+```{r}
+showResults(weight_fit)
+```
+
+
+# Parameter Tuning - KNN
+
+```{r}
+grid <- expand.grid(.kmax = c(5, 10, 25), 
+                    .distance=c(1, 2), 
+                    .kernel=c("rectangular", "triangular", 
+                              "biweight", "cos", "gaussian", "optimal"))
+
+ctrl <- trainControl(method = "repeatedcv", 
+                     number = 10, repeats = 5, 
+                      classProbs = TRUE, returnResamp = "all")
+
+kknn_fit <- train(formula, 
+                  data = train, 
+                  method = "kknn", 
+                  metric="Kappa", 
+                  trControl=ctrl, tuneGrid = grid)
+
+summary(kknn_fit)
+kknn_fit
+plot(kknn_fit)
+showResults(kknn_fit)
+```
+
+# Feature Selection
+
+```{r}
+# SBF = Selection By Filtering
+set.seed(10)
+df = df.orig
+dim(df)
+filterCtrl <- sbfControl(functions = rfSBF)
+r <- sbf(formula, data = df, sbfControl = filterCtrl)
+r
+```
+
+# Model Selection
+
+```{r}
+set.seed(123)
+
+ctrl <- trainControl(method = "repeatedcv", 
+                     number = 10, repeats = 5, classProbs = TRUE)
+
+rpartFit <- train(formula, data = train, "rpart",
+                  preProc=c('nzv', 'center', 'scale'),
+                  trControl = ctrl, tuneLength = 10, metric="Kappa")
+
+svmFit <- train(formula, data = train, "svmLinear3",
+                  preProc=c('nzv', 'center', 'scale'),
+                  trControl = ctrl, tuneLength = 10, metric="Kappa")
+
+nbFit <- train(formula, data = train, "naive_bayes",
+                  preProc=c('nzv', 'center', 'scale'),
+                  trControl = ctrl, tuneLength = 10, metric="Kappa")
+
+rfFit <- train(formula, data = train, "parRF",
+                  preProc=c('nzv', 'center', 'scale'),
+                  trControl = ctrl, tuneLength = 10, metric="Kappa")
+
+gbmFit <- train(formula, data = train, "gbm", 
+                preProc=c('nzv', 'center', 'scale'),
+                trControl = ctrl, tuneLength = 10, metric="Kappa", verbose=F)
+
+kknnFit <- train(formula, data = train, "kknn", 
+                 preProc=c('nzv', 'center', 'scale'),
+                 trControl = ctrl, tuneLength = 10, metric="Kappa")
+
+# See how things are looking
+rpartFit
+svmFit
+nbFit
+rfFit
+gbmFit
+kknnFit
+
+resamps <- resamples(list(rpart = rpartFit,
+                          svm = svmFit,
+                          nb = nbFit,
+                          rf = rfFit,
+                          gbm = gbmFit,
+                          kknn = kknnFit))
+
+
+summary(resamps)
+bwplot(resamps)
+```

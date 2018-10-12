@@ -1,0 +1,91 @@
+---
+title: "Illustrating Ensemble Models - Smarket Data"
+output: 
+  html_document:
+      toc: yes
+      toc_float: yes
+      code_folding: hide
+---
+
+This data set consists of percentage returns for the S&P 500 stock index over 1,250 days from the beginning of 2001 until the end of 2005. For each date, we have recorded the percentage returns for each of the five previous trading days, Lag1 through Lag5. We have also recorded Volume (the number of shares traded on the previous day, in billions), Today (the percentage return on the date in question) and Direction (whether the market was Up or Down on this date).
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r, warning = FALSE, message = FALSE}
+library(tidyverse)
+library(MLmetrics)
+```
+
+
+```{r}
+# Helper function to print the confusion matrix and other performance metrics of the models.
+printPerformance = function(pred, actual, positive="yes") {
+  print(table(actual, pred))
+  print("")
+  
+  print(sprintf("Accuracy:    %.3f", Accuracy(y_true=actual, y_pred=pred)))
+  print(sprintf("Precision:   %.3f", Precision(y_true=actual, y_pred=pred, positive=positive)))
+  print(sprintf("Recall:      %.3f", Recall(y_true=actual, y_pred=pred, positive=positive)))
+  print(sprintf("F1 Score:    %.3f", F1_Score(pred, actual, positive=positive)))
+  print(sprintf("Sensitivity: %.3f", Sensitivity(y_true=actual, y_pred=pred, positive=positive)))
+  print(sprintf("Specificity: %.3f", Specificity(y_true=actual, y_pred=pred, positive=positive)))
+}
+```
+
+# Read in the data
+
+```{r}
+library(ISLR)
+df <- Smarket %>%
+  dplyr::select(-Today)
+str(df)
+head(df)
+summary(df)
+```
+
+# Splitting the data
+
+```{r}
+set.seed(123) # Set the seed to make it reproducible
+train <- sample_frac(df, 0.8)
+test <- setdiff(df, train)
+actual = test$Direction
+formula = Direction ~ .
+positive = "Up"
+```
+
+# Decision Tree
+
+```{r, warning = FALSE}
+library(rpart)
+library(rpart.plot) # For pretty trees
+set.seed(123)
+tree <- rpart(formula, method="class", data=train)
+rpart.plot(tree, extra=2, type=2)
+predicted = predict(tree, test, type="class") 
+printPerformance(predicted, actual, positive = positive)
+```
+
+# Random Forests
+
+```{r, warning = FALSE}
+library(randomForest)
+set.seed(123) 
+rf = randomForest(formula, data=train, mtry=3, ntree=100, importance=TRUE)
+rf.predicted = predict(rf, test, type="class") 
+printPerformance(rf.predicted, actual, positive = positive)
+varImpPlot(rf)
+```
+
+# Boosting
+
+```{r, warning = FALSE}
+library(fastAdaboost)
+set.seed(123)
+boost = adaboost(formula, data=train, nIter=1000)
+boost.predicted = predict(boost, newdata=test)
+printPerformance(boost.predicted$class, actual, positive = positive)
+```

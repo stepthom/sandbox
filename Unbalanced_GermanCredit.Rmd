@@ -1,0 +1,198 @@
+---
+title: "Unbalanced German Credit"
+output: 
+  html_document:
+      toc: yes
+      toc_float: yes
+      code_folding: hide
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r}
+library(dplyr)
+library(caret)
+library(rpart)
+library(rpart.plot)
+library(purrr) # for functional programming (map)
+```
+
+Originally inspired by https://www.r-bloggers.com/handling-class-imbalance-with-r-and-caret-an-introduction/.
+
+```{r}
+# Helper function to print the confusion matrix and other performance metrics of the models.
+printPerformance = function(pred, actual, positive="Yes") {
+  print(caret::confusionMatrix(data=pred, reference=actual, positive=positive, dnn=c("Predicted", "Actual")))
+}
+```
+
+
+```{r}
+data(GermanCredit, package = "caret")
+df = GermanCredit
+df$Class = as.character(df$Class)
+df$Class[df$Class == "Bad"] = "Not Good" 
+df$Class = as.factor(df$Class)
+str(df)
+head(df)
+table(df$Class)
+```
+# Splitting the Data
+
+```{r}
+set.seed(123) # Set the seed to make it reproducible
+
+train.index <- createDataPartition(df$Class, p = .8, list = FALSE)
+train <- df[ train.index,]
+test  <- df[-train.index,]
+
+# Double check that the stratefied sampling worked
+table(df$Class)/nrow(df)
+table(train$Class)/nrow(train)
+table(test$Class)/nrow(test)
+
+actual = test$Class
+formula = Class ~ .
+positive = "Good"
+```
+
+
+
+# Training Models withe the Various Techniques
+
+```{r}
+metric = "Accuracy"
+
+ctrl <- trainControl(method = "repeatedcv", number = 10, repeats = 5, classProbs = FALSE)
+orig_fit <- train(formula, data = train, method = "rpart", metric = metric, trControl = ctrl)
+
+kappa_fit <- train(formula, data = train, method = "rpart", metric = "Kappa", trControl = ctrl)
+
+weight = table(train$Class)["Not Good"] / table(train$Class)["Good"] 
+model_weights <- ifelse(train$Class == "Good", weight, 1)
+weight_fit <- train(formula, data = train, method = "rpart", metric = metric, weights=model_weights, trControl = ctrl)
+
+FN_cost = 10
+FP_cost = 1
+cost_fn <- train(formula, data = train, method = "rpart", metric = metric, 
+                    parms=list(loss=matrix(c(0,FN_cost,FP_cost,0), byrow=TRUE, nrow=2)), 
+                    trControl = ctrl)
+
+FN_cost = 1
+FP_cost = 10
+cost_fp <- train(formula, data = train, method = "rpart", metric = metric, 
+                    parms=list(loss=matrix(c(0,FN_cost,FP_cost,0), byrow=TRUE, nrow=2)), 
+                    trControl = ctrl)
+
+ctrl$sampling = "down"
+down_fit <- train(formula, data = train, method = "rpart", metric = metric, trControl = ctrl)
+
+
+ctrl$sampling = "smote"
+smote_fit <- train(formula, data = train, method = "rpart", metric = metric, trControl = ctrl)
+
+ctrl$sampling = "smote"
+metric="Kappa"
+all_fit <- train(formula, data = train, method = "rpart", metric = metric, trControl = ctrl)
+```
+
+
+# Assessing the Performance of the techniques
+
+```{r}
+assessModel = function(m_name, m){
+  pred = predict(m$finalModel, test, type="class")
+  a = caret::confusionMatrix(data=pred, reference=actual, positive=positive, dnn=c("Predicted", "Actual"))
+  res1 = data.frame(name=m_name, 
+                   accuracy=a$overall["Accuracy"], 
+                   precision=a$byClass["Precision"],
+                   recall=a$byClass["Recall"],
+                   specificity=a$byClass["Specificity"],
+                   kappa=a$overall["Kappa"])
+  res1
+}
+
+res = data.frame(name=character(), accuracy=numeric(), precision=numeric(), recall=numeric(), specificity=numeric(), kappa=numeric())
+res = rbind(res, assessModel("orig", orig_fit))
+res = rbind(res, assessModel("kappa", kappa_fit))
+res = rbind(res, assessModel("weights", weight_fit))
+res = rbind(res, assessModel("cost fn", cost_fn))
+res = rbind(res, assessModel("cost fp", cost_fp))
+res = rbind(res, assessModel("down", down_fit))
+res = rbind(res, assessModel("smote", smote_fit))
+res = rbind(res, assessModel("all", all_fit))
+row.names(res) = NULL
+res
+```
+
+```{r}
+library(formattable)
+library(kableExtra)
+#res %>%
+  #mutate(
+  #  accuracy = color_tile("white", "orange")(accuracy),
+  #  precision = ifelse(precision > 200,
+  #                kableExtra::cell_spec(precision, color = "red", bold = T),
+  #                kableExtra::cell_spec(precision, color = "green", italic = T)),
+  #  recall = color_bar("lightgreen")(recall)
+  #) %>%
+  #kable(escape = F) %>%
+  #kable_styling("hover", full_width = F)
+
+```
+
+
+```{r}
+# Function to show the confusion matrix and resulting tree
+showResults = function(model){
+  pred = predict(model$finalModel, test, type="class")
+  print(caret::confusionMatrix(data=pred, reference=actual, positive=positive, dnn=c("Predicted", "Actual")))
+  rpart.plot(model$finalModel, extra=2, type=2)
+}
+```
+
+# Original
+
+```{r}
+showResults(orig_fit)
+```
+
+# Kappa
+
+```{r}
+showResults(kappa_fit)
+```
+
+# Weights
+
+```{r}
+showResults(weight_fit)
+```
+
+# Costs - FP
+
+```{r}
+showResults(cost_fp)
+```
+
+# Costs - FN
+
+```{r}
+showResults(cost_fn)
+```
+
+# Down sampling
+
+```{r}
+showResults(down_fit)
+```
+
+# All
+
+```{r}
+showResults(all_fit)
+```
+
