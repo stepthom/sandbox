@@ -1,7 +1,15 @@
 ---
 title: "Unbalanced HR"
-output: html_document
+output: 
+  html_document:
+      toc: yes
+      toc_float: yes
+      code_folding: hide
 ---
+
+# Introduction
+
+Given the potential disruption to the work environment and the required resources to attract, acquire, and train new talent, understanding factors that influence employee attrition is important to human resource departments. In this exercise, we'll explore the IBM Human Resources Analytics dataset, which contains data on employee attrition (whether an employee will leave the company).  
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
@@ -17,7 +25,6 @@ library(purrr) # for functional programming (map)
 library(rsample) # contains the IBM attrition data set
 ```
 
-Originally inspired by https://www.r-bloggers.com/handling-class-imbalance-with-r-and-caret-an-introduction/.
 
 ```{r}
 # Helper function to print the confusion matrix and other performance metrics of the models.
@@ -26,17 +33,17 @@ printPerformance = function(pred, actual, positive="Yes") {
 }
 ```
 
+First, let's load in the data and take a peak.
 
 ```{r}
 data(attrition, package="rsample")
 df <- attrition 
-#df = df %>% 
-#  mutate_if(is.character, as.factor)
 str(df)
 head(df)
 table(df$Attrition)
 ```
-# Splitting the Data
+
+Next, let's split the data into training and testing.
 
 ```{r}
 set.seed(123) # Set the seed to make it reproducible
@@ -44,24 +51,37 @@ set.seed(123) # Set the seed to make it reproducible
 train.index <- createDataPartition(df$Attrition, p = .8, list = FALSE)
 train <- df[ train.index,]
 test  <- df[-train.index,]
+```
 
-# Double check that the stratefied sampling worked
+Let's look at the imbalance of the classes in the full, training, and testing data sets.
+
+```{r}
 table(df$Attrition)/nrow(df)
 table(train$Attrition)/nrow(train)
 table(test$Attrition)/nrow(test)
-
-actual = test$Attrition
-formula = Attrition ~ .
-positive = "Yes"
 ```
 
 
+# Model Training
 
-# Training Models withe the Various Techniques
+We train eight different models. 
+
+- Original. A decision tree, using CV with Accuracy as the assessment metric. (I.e., no adjustments are made to deal with the class imbalance problem.) 
+- Kappa. Same as Original, except during CV, the kappa metric is used instead of the accuracy metric.
+- Weighted. Same as Original, except "No" observations are weighted .84 and "yes" observations are weighted .16.
+- Cost FN. Same as Original, except false negatives are given a cost of 4 and false positives are given a cost of 1.
+- Cost FP. Same as Original, except false positives are given a cost of 4 and false negatives are given a cost of 1.
+- Down. Same as Original, except training data is first down sampled.
+- SMOTE. Same as Original, except new training data is artificially generated using the SMOTE method.
+- All. Same as Original, except the kappa metric is used during CV, and down sampling method is used.
 
 ```{r}
 metric = "Accuracy"
+actual = test$Attrition
+formula = Attrition ~ .
+positive = "Yes"
 
+set.seed(123)
 ctrl <- trainControl(method = "repeatedcv", number = 10, repeats = 5, classProbs = FALSE)
 orig_fit <- train(formula, data = train, method = "rpart", metric = metric, trControl = ctrl)
 
@@ -71,16 +91,16 @@ weight = table(train$Attrition)["No"] / table(train$Attrition)["Yes"]
 model_weights <- ifelse(train$Attrition == "Yes", weight, 1)
 weight_fit <- train(formula, data = train, method = "rpart", metric = metric, weights=model_weights, trControl = ctrl)
 
-FN_cost = 10
+FN_cost = 4
 FP_cost = 1
 cost_fn <- train(formula, data = train, method = "rpart", metric = metric, 
-                    parms=list(loss=matrix(c(0,FN_cost,FP_cost,0), byrow=TRUE, nrow=2)), 
+                    parms=list(loss=matrix(c(0,FP_cost,FN_cost,0), byrow=TRUE, nrow=2)), 
                     trControl = ctrl)
 
 FN_cost = 1
-FP_cost = 10
+FP_cost = 4
 cost_fp <- train(formula, data = train, method = "rpart", metric = metric, 
-                    parms=list(loss=matrix(c(0,FN_cost,FP_cost,0), byrow=TRUE, nrow=2)), 
+                    parms=list(loss=matrix(c(0,FP_cost,FN_cost,0), byrow=TRUE, nrow=2)), 
                     trControl = ctrl)
 
 ctrl$sampling = "down"
@@ -90,13 +110,15 @@ down_fit <- train(formula, data = train, method = "rpart", metric = metric, trCo
 ctrl$sampling = "smote"
 smote_fit <- train(formula, data = train, method = "rpart", metric = metric, trControl = ctrl)
 
-ctrl$sampling = "smote"
+ctrl$sampling = "down"
 metric="Kappa"
 all_fit <- train(formula, data = train, method = "rpart", metric = metric, trControl = ctrl)
 ```
 
 
-# Assessing the Performance of the techniques
+# Performance Assessment
+
+Here's a summary of the performance of all of the techniques.
 
 ```{r}
 assessModel = function(m_name, m){
@@ -124,22 +146,6 @@ row.names(res) = NULL
 res
 ```
 
-```{r}
-library(formattable)
-library(kableExtra)
-#res %>%
-  #mutate(
-  #  accuracy = color_tile("white", "orange")(accuracy),
-  #  precision = ifelse(precision > 200,
-  #                kableExtra::cell_spec(precision, color = "red", bold = T),
-  #                kableExtra::cell_spec(precision, color = "green", italic = T)),
-  #  recall = color_bar("lightgreen")(recall)
-  #) %>%
-  #kable(escape = F) %>%
-  #kable_styling("hover", full_width = F)
-
-```
-
 
 ```{r}
 # Function to show the confusion matrix and resulting tree
@@ -150,43 +156,45 @@ showResults = function(model){
 }
 ```
 
-# Original
+Here are the details of the performance of each technique.
+
+## Original
 
 ```{r}
 showResults(orig_fit)
 ```
 
-# Kappa
+## Kappa
 
 ```{r}
 showResults(kappa_fit)
 ```
 
-# Weights
+## Weights
 
 ```{r}
 showResults(weight_fit)
 ```
 
-# Costs - FP
+## Costs - High FP cost
 
 ```{r}
 showResults(cost_fp)
 ```
 
-# Costs - FN
+## Costs - High FN Cost
 
 ```{r}
 showResults(cost_fn)
 ```
 
-# Down sampling
+## Down sampling
 
 ```{r}
 showResults(down_fit)
 ```
 
-# All
+## All
 
 ```{r}
 showResults(all_fit)

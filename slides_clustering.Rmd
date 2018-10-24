@@ -17,6 +17,11 @@ library(ggplot2)
 library(readr)
 library(extrafont)
 library(ggthemes)
+library(caret)
+library(cluster) # For preprocessing
+library(factoextra) # for elbow plots
+library(amap) # For distance metrics
+library(stylo) # For cosine distance
 loadfonts(quiet = T)
 ```
 
@@ -25,19 +30,21 @@ loadfonts(quiet = T)
 ```{r}
 dat <- read_csv("data/Mall_Customers_With_output.csv")
 str(dat)
-head(dat)
+dat %>%
+  select(CustomerID, Genre, Age, AnnualIncome, SpendingScore) %>%
+  head(n=15)
 ```
 ```{r}
 plotClust = function(df, colorCol) {
   ggplot(df, aes(x=AnnualIncome, y=SpendingScore)) + 
-  geom_point(aes(color=factor(colorCol)), size=4) +
+  geom_point(aes(color=factor(colorCol)), size=6) +
   geom_rangeframe() + 
   theme_tufte(base_family="Calibri") + 
-  theme(legend.position="none") + 
-  theme(axis.title.x = element_text(colour="grey20",size=40,face="plain")) + 
-  theme(axis.title.y = element_text(colour="grey20",size=40,face="plain")) + 
-  theme(axis.text.x = element_text(colour="grey20",size=32,face="plain")) + 
-  theme(axis.text.y = element_text(colour="grey20",size=32,face="plain")) +
+  #theme(legend.position="none") + 
+  theme(axis.title.x = element_text(colour="grey20",size=30,face="plain")) + 
+  theme(axis.title.y = element_text(colour="grey20",size=30,face="plain")) + 
+  theme(axis.text.x = element_text(colour="grey20",size=20,face="plain")) + 
+  theme(axis.text.y = element_text(colour="grey20",size=20,face="plain")) +
   labs(x = "Annual Income (K)", y ="Spending Score") 
   
 }
@@ -70,58 +77,159 @@ ggplot(dat, aes(x=AnnualIncome, y=SpendingScore)) +
 # Scaling the data
 
 ```{r}
+pre = preProcess(dat[,c("Age", "AnnualIncome", "SpendingScore")], method="range")
+dat.scaled = predict(pre, dat, method=c("range"))
+head(dat)
+head(dat.scaled)
+dat.scaled %>%
+  select(CustomerID, Genre, Age, AnnualIncome, SpendingScore) %>%
+  head(n=15)
+```
 
+# Playing with Distance Metrics
+
+```{r}
+
+df = dat.scaled[,c("Age", "AnnualIncome", "SpendingScore")]
+dd_euc = as.matrix(Dist(df, method = "euclidean"))
+dd_man = as.matrix(Dist(df, method = "manhattan"))
+dd_cos = as.matrix(dist.cosine(as.matrix(df)))
+
+
+# Check ou the three closest and farthest people from Customer ID 1
+print("euc")
+n = ncol(dd_euc)
+idx = order(dd_euc[1,])[2:4]
+idx
+dd_euc[1, idx]
+df[c(1, idx),]
+idx_long = order(dd_euc[1,])[(n-2):n]
+idx_long
+dd_euc[1, idx_long]
+df[c(1, idx_long),]
+
+
+print("man")
+n = ncol(dd_man)
+idx = order(dd_man[1,])[2:4]
+idx
+dd_man[1, idx]
+df[c(1, idx),]
+idx_long = order(dd_man[1,])[(n-2):n]
+idx_long
+dd_man[1, idx_long]
+df[c(1, idx_long),]
+
+
+print("cos")
+n = ncol(dd_cos)
+idx = order(dd_cos[1,])[2:4]
+idx
+dd_cos[1, idx]
+df[c(1, idx),]
+idx_long = order(dd_cos[1,])[(n-2):n]
+idx_long
+dd_cos[1, idx_long]
+df[c(1, idx_long),]
 
 ```
 
 
 # K-means
 
-
 ```{r}
 set.seed(123)
 
-clusters = kmeans(dat[,4:5], centers=5, nstart=10)
-dat$kmeans1 = clusters$cluster
-plotClust(dat, clusters$cluster)
+clusters = kmeans(dat.scaled[,c("AnnualIncome", "SpendingScore")], centers=5, nstart=10)
+dat.scaled$kmeans5 = clusters$cluster
+clusters$tot.withinss
+plotClust(dat.scaled, clusters$cluster)
+ggsave(file="out/cluster_kmeans5.png", width=iwidth, height=iheight)
+head(dat.scaled, n=15)
+clusters$centers
+clusters$size
 
-clusters = kmeans(dat[,4:5], centers=2, nstart=10)
-plotClust(dat, clusters$cluster)
 
-clusters = kmeans(dat[,4:5], centers=10, nstart=10)
+clusters = kmeans(dat.scaled[,c("AnnualIncome", "SpendingScore")], 
+                  centers=3, 
+                  nstart=10)
+dat.scaled$kmeans3 = clusters$cluster
+clusters$tot.withinss
+head(dat.scaled, n=15)
+plotClust(dat.scaled, clusters$cluster)
+ggsave(file="out/cluster_kmeans3.png", width=iwidth, height=iheight)
+
+clusters = kmeans(dat.scaled[,c("AnnualIncome", "SpendingScore")], centers=10, nstart=10)
 plotClust(dat, clusters$cluster)
 
 #ggsave(file="out/cluster_kmeans1.png", width=iwidth, height=iheight)
 ```
 
+## Elbow Plot
+
+```{r}
+set.seed(123)
+fviz_nbclust(dat.scaled[,c("AnnualIncome", "SpendingScore")], kmeans, method = "silhouette", k.max=15)
+ggsave(file="out/kmeans_sil.png", width=6, height=4)
+
+fviz_nbclust(dat.scaled[,c("AnnualIncome", "SpendingScore")], kmeans, method = "wss", k.max=15)
+ggsave(file="out/kmeans_wss.png", width=6, height=4)
+```
+
+## Which Distance Measure?
+
+```{r}
+df = dat.scaled[,c("AnnualIncome", "SpendingScore")]
+dd_euc = dist(df, method = "euclidean")
+dd_man = dist(df, method = "manhattan")
+dd_min = dist(df, method = "minkowski")
+
+k <- 5
+
+set.seed(123)
+
+res = data.frame(method=character(), wss=numeric(), betweenss=numeric())
+
+clusters = kmeans(dd_euc, k, nstart=50)
+res = rbind(res, data.frame(method="euclidean", wss=clusters$tot.withinss, betweenness=clusters$betweenss))
+plotClust(df, clusters$cluster)
+ggsave(file="out/kmeans_euc.png", width=iwidth, height=iheight)
+
+clusters = kmeans(dd_man, k, nstart=50)
+res = rbind(res, data.frame(method="manhattan", wss=clusters$tot.withinss, betweenness=clusters$betweenss))
+plotClust(df, clusters$cluster)
+ggsave(file="out/kmeans_man.png", width=iwidth, height=iheight)
+
+clusters = kmeans(dd_min, k, nstart=50)
+res = rbind(res, data.frame(method="minkowski", wss=clusters$tot.withinss, betweenness=clusters$betweenss))
+plotClust(df, clusters$cluster)
+ggsave(file="out/kmeans_min.png", width=iwidth, height=iheight)
+
+res
+```
+
+
+
+
 
 # DBSCAN
 
-
 ```{r}
 library(dbscan)
+
 set.seed(123)
 
-kNNdistplot(dat[,4:5], k = 3)
+kNNdistplot(dat.scaled[,c("AnnualIncome", "SpendingScore")], k = 3)
+# Right Click on the image below, then "Copy"
 
-clusters = dbscan(dat[,4:5], minPts = 3, eps = 11)
-clusters
-dat$dbscan1 = clusters$cluster
-dat$dbscan1
+clusters = dbscan(dat.scaled[,c("Age", "AnnualIncome", "SpendingScore")], 
+                  minPts = 3, 
+                  eps = .14)
+dat.scaled$dbscan = clusters$cluster
 
-pairs(dat[,4:5], col=clusters$cluster + 1L)
+plotClust(dat.scaled, dat.scaled$dbscan)
+ggsave(file="out/dbscan.png", width=iwidth, height=iheight)
 
-ggplot(dat, aes(x=AnnualIncome, y=SpendingScore)) + 
-  geom_point(aes(color=factor(dbscan1)), size=4) +
-  geom_rangeframe() + 
-  theme_tufte(base_family="Calibri") + 
-  theme(axis.title.x = element_text(colour="grey20",size=40,face="plain")) + 
-  theme(axis.title.y = element_text(colour="grey20",size=40,face="plain")) + 
-  theme(axis.text.x = element_text(colour="grey20",size=32,face="plain")) + 
-  theme(axis.text.y = element_text(colour="grey20",size=32,face="plain")) +
-  labs(x = "Annual Income (K)", y ="Spending Score") 
-
-#ggsave(file="out/cluster_kmeans1.png", width=iwidth, height=iheight)
 ```
 
 
@@ -129,24 +237,23 @@ ggplot(dat, aes(x=AnnualIncome, y=SpendingScore)) +
 
 
 ```{r}
-
 set.seed(123)
 
-clusters = hclust(dist(dat[,4:5])) 
-clusters
-plot(clusters)
-dat$hclust1 = cutree(clusters, 5)
-dat$hclust1
+clusters = hclust(dist(dat.scaled[,c("AnnualIncome", "SpendingScore")])) 
+hcd <- as.dendrogram(clusters)
+plot(hcd)
+plot(hcd, xlim = c(1, 20), ylim = c(0,0.4))
 
-ggplot(dat, aes(x=AnnualIncome, y=SpendingScore)) + 
-  geom_point(aes(color=factor(hclust1)), size=4) +
-  geom_rangeframe() + 
-  theme_tufte(base_family="Calibri") + 
-  theme(axis.title.x = element_text(colour="grey20",size=40,face="plain")) + 
-  theme(axis.title.y = element_text(colour="grey20",size=40,face="plain")) + 
-  theme(axis.text.x = element_text(colour="grey20",size=32,face="plain")) + 
-  theme(axis.text.y = element_text(colour="grey20",size=32,face="plain")) +
-  labs(x = "Annual Income (K)", y ="Spending Score") 
 
-#ggsave(file="out/cluster_kmeans1.png", width=iwidth, height=iheight)
+dat.scaled$hclust5 = cutree(clusters, 5)
+plotClust(dat.scaled, dat.scaled$hclust5)
+ggsave(file="out/cluster_hclust5.png", width=iwidth, height=iheight)
+
+dat.scaled$hclust3 = cutree(clusters, 3)
+plotClust(dat.scaled, dat.scaled$hclust3)
+ggsave(file="out/cluster_hclust3.png", width=iwidth, height=iheight)
+
+dat.scaled$hclust8 = cutree(clusters, 8)
+plotClust(dat.scaled, dat.scaled$hclust8)
+ggsave(file="out/cluster_hclust8.png", width=iwidth, height=iheight)
 ```

@@ -1,0 +1,98 @@
+---
+title: "Feature Engineering German Credit - Baseline Attempt"
+output: 
+  html_document:
+      toc: yes
+      toc_float: yes
+      code_folding: hide
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r}
+library(dplyr)
+library(caret)
+library(rpart)
+library(rpart.plot)
+```
+
+# Load Data
+
+```{r}
+data(GermanCredit, package = "caret")
+df = GermanCredit
+df$Class = as.character(df$Class)
+df$Class[df$Class == "Bad"] = "NotGood" # Rename, just for personal preference.
+df$Class = as.factor(df$Class)
+str(df)
+head(df)
+table(df$Class)
+formula = Class ~ .
+positive = "Good"
+```
+
+# Feature Engineering
+
+```{r}
+# Hint: use the preProcess() and predict() fkunctions
+#p1 <- preProcess(...)
+#df = predict(p1, df)
+```
+
+# Feature Selection
+
+```{r}
+dim(df)
+set.seed(10)
+
+# The following snippet will perform feature selection using caret's SBF = Selection By Filtering
+#filterCtrl <- sbfControl(functions = rfSBF, number=1, verbose=T)
+#r <- sbf(formula, data = df, sbfControl = filterCtrl)
+#r
+#df = cbind(df[,predictors(r)], Class=df$Class)]
+#dim(df)
+```
+
+# Splitting the Data
+
+```{r}
+set.seed(123) # Set the seed to make it reproducible
+
+train.index <- createDataPartition(df$Class, p = .8, list = FALSE)
+train <- df[ train.index,]
+test  <- df[-train.index,]
+
+# Double check that the stratefied sampling worked
+table(df$Class)/nrow(df)
+table(train$Class)/nrow(train)
+table(test$Class)/nrow(test)
+
+actual = test$Class
+```
+
+# Parameter Tuning - KNN
+
+```{r}
+grid <- expand.grid(.kmax = c(5), 
+                    .distance=c(1), 
+                    .kernel=c("rectangular"))
+
+ctrl <- trainControl(method = "repeatedcv", 
+                     number = 10, repeats = 5, 
+                      classProbs = TRUE, returnResamp = "all")
+
+model_fit <- train(formula, 
+                  data = train, 
+                  method = "kknn", 
+                  metric="Accuracy", 
+                  trControl=ctrl, tuneGrid = grid)
+
+summary(model_fit)
+model_fit
+
+pred = predict(model_fit, test)
+caret::confusionMatrix(data=pred, reference=actual, positive=positive, dnn=c("Predicted", "Actual"))
+```

@@ -92,6 +92,7 @@ ggsave(file="cluster_2.pdf", width=iwidth, height=iheight)
 library(ggplot2)
 library(readr)
 library(extrafont)
+library(ggthemes)
 loadfonts(quiet = T)
 
 dat <- read_csv("data/Mall_Customers_With_output.csv")
