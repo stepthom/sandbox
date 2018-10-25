@@ -24,7 +24,7 @@ library(caretEnsemble)
 # Read in the data
 
 ```{r}
-df <- read_csv("C:/Users/st50/Documents/sandbox/data/bank-additional/bank-additional-full.csv")
+df <- read_csv("data/bank-additional/bank-additional-full.csv")
 df = df %>% 
   dplyr::rename(bought=y) %>%
   mutate_if(is.character, as.factor)
@@ -47,7 +47,7 @@ actual = test$bought
 
 # Committee
 
-```{r, warning = FALSE}
+```{r committee, warning = FALSE}
 set.seed(123)
 
 ctrl = trainControl(
@@ -75,11 +75,13 @@ ensemble_fit <- caretEnsemble(
     ))
 summary(ensemble_fit)
 
+ensemble_pred = predict(ensemble_fit, test)
+caret::confusionMatrix(data=ensemble_pred, reference=actual, positive=positive, dnn=c("Predicted", "Actual"))
 ```
 
 # Random Forests
 
-```{r, warning = FALSE}
+```{r parrf, warning = FALSE}
 set.seed(123)
 ctrl <- trainControl(method = "repeatedcv", 
                      number = 10, repeats = 5, 
@@ -93,27 +95,32 @@ rf_fit <- train(formula, data = train, "parRF",
                   metric="Kappa", allowParallel = TRUE)
 
 summary(rf_fit)
+
 pred = predict(rf_fit, test)
-caret::confusionMatrix(data=pred, reference=actual, positive=positive, dnn=c("Predicted", "Actual"))
+caret::confusionMatrix(data=rf_fit, reference=actual, positive=positive, dnn=c("Predicted", "Actual"))
 ```
 
 # Random Forests
 
-```{r, warning = FALSE}
+```{r rf, warning = FALSE}
 library(randomForest)
 set.seed(123) 
-rf = randomForest(formula, data=train, mtry=3, ntree=100, importance=TRUE)
-rf.predicted = predict(rf, test, type="class") 
-printPerformance(rf.predicted, actual, positive = positive)
-varImpPlot(rf)
+rf2_fit = randomForest(formula, data=train, mtry=3, ntree=100, importance=TRUE)
+
+summary(rf2_fit)
+
+rf2_pred = predict(rf2_fit, test, type="class") 
+caret::confusionMatrix(data=rf2_pred, reference=actual, positive=positive, dnn=c("Predicted", "Actual"))
+
+varImpPlot(rf2_fit)
 ```
 
-# Boosting
+# Boosting with Adaboost
 
-```{r, warning = FALSE}
+```{r adaboost, warning = FALSE}
 library(fastAdaboost)
 set.seed(123)
 boost = adaboost(formula, data=train, nIter=20)
-boost.predicted = predict(boost, newdata=test)
-printPerformance(boost.predicted$class, actual, positive = positive)
+boost_pred = predict(boost, newdata=test)
+caret::confusionMatrix(data=boost_pred, reference=actual, positive=positive, dnn=c("Predicted", "Actual"))
 ```
