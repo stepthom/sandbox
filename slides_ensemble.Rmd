@@ -1,0 +1,119 @@
+---
+title: "Illustrating Ensemble Models"
+output: 
+  html_document:
+      toc: yes
+      toc_float: yes
+      code_folding: hide
+---
+
+This case comes from the UCL Machine Learning Repository, and is called the [Bank Marketing Data Set](https://archive.ics.uci.edu/ml/datasets/bank+marketing).
+
+The data is related with direct marketing campaigns of a Portuguese banking institution. The marketing campaigns were based on phone calls. Often, more than one contact to the same client was required, in order to access if the product (bank term deposit) would be ('yes') or not ('no') bought.
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r, warning = FALSE, message = FALSE}
+library(tidyverse)
+library(caret)
+library(caretEnsemble)
+```
+
+# Read in the data
+
+```{r}
+df <- read_csv("C:/Users/st50/Documents/sandbox/data/bank-additional/bank-additional-full.csv")
+df = df %>% 
+  dplyr::rename(bought=y) %>%
+  mutate_if(is.character, as.factor)
+head(df)
+summary(df)
+```
+
+# Split the data and Set Some Constants
+
+```{r}
+set.seed(123)
+train.index <- createDataPartition(df$bought, p = .8, list = FALSE)
+train <- df[ train.index,]
+test  <- df[-train.index,]
+
+formula = bought ~ .
+positive = "yes"
+actual = test$bought
+```
+
+# Committee
+
+```{r, warning = FALSE}
+set.seed(123)
+
+ctrl = trainControl(
+  method="boot",
+  number=10,
+  savePredictions="final",
+  classProbs=TRUE,
+  index=createResample(train$bought, 10),
+  summaryFunction=twoClassSummary
+  )
+
+model_list <- caretList(
+  bought~., data=train,
+  trControl=ctrl,
+  methodList=c("naive_bayes", "rpart", "knn")
+)
+
+ensemble_fit <- caretEnsemble(
+  model_list, 
+  metric="ROC",
+  trControl=trainControl(
+    number=2,
+    summaryFunction=twoClassSummary,
+    classProbs=TRUE
+    ))
+summary(ensemble_fit)
+
+```
+
+# Random Forests
+
+```{r, warning = FALSE}
+set.seed(123)
+ctrl <- trainControl(method = "repeatedcv", 
+                     number = 10, repeats = 5, 
+                      classProbs = TRUE, returnResamp = "all", sampling="down")
+
+rf_grid <- expand.grid(.mtry = c(50, 100, 500))
+
+rf_fit <- train(formula, data = train, "parRF",
+                  preProc=c('nzv', 'center', 'scale'),
+                  trControl = ctrl, tuneGrid = rf_grid, 
+                  metric="Kappa", allowParallel = TRUE)
+
+summary(rf_fit)
+pred = predict(rf_fit, test)
+caret::confusionMatrix(data=pred, reference=actual, positive=positive, dnn=c("Predicted", "Actual"))
+```
+
+# Random Forests
+
+```{r, warning = FALSE}
+library(randomForest)
+set.seed(123) 
+rf = randomForest(formula, data=train, mtry=3, ntree=100, importance=TRUE)
+rf.predicted = predict(rf, test, type="class") 
+printPerformance(rf.predicted, actual, positive = positive)
+varImpPlot(rf)
+```
+
+# Boosting
+
+```{r, warning = FALSE}
+library(fastAdaboost)
+set.seed(123)
+boost = adaboost(formula, data=train, nIter=20)
+boost.predicted = predict(boost, newdata=test)
+printPerformance(boost.predicted$class, actual, positive = positive)
+```
