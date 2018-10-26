@@ -12,7 +12,7 @@ This case comes from the UCL Machine Learning Repository, and is called the [Ban
 The data is related with direct marketing campaigns of a Portuguese banking institution. The marketing campaigns were based on phone calls. Often, more than one contact to the same client was required, in order to access if the product (bank term deposit) would be ('yes') or not ('no') bought.
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(echo = TRUE, error=TRUE)
 ```
 
 ```{r, warning = FALSE, message = FALSE}
@@ -23,22 +23,29 @@ library(caretEnsemble)
 
 # Read in the data
 
-```{r}
+```{r readdata, cache=TRUE}
 df <- read_csv("data/bank-additional/bank-additional-full.csv")
 df = df %>% 
   dplyr::rename(bought=y) %>%
   mutate_if(is.character, as.factor)
+
 head(df)
 summary(df)
 ```
 
 # Split the data and Set Some Constants
 
-```{r}
+```{r split, cache=TRUE}
 set.seed(123)
 train.index <- createDataPartition(df$bought, p = .8, list = FALSE)
 train <- df[ train.index,]
 test  <- df[-train.index,]
+
+# fastAdaboost will complain later if we don't do this:
+test = as.data.frame(test)
+test$bought = as.factor(test$bought)
+train = as.data.frame(train)
+train$bought = as.factor(train$bought)
 
 formula = bought ~ .
 positive = "yes"
@@ -47,8 +54,13 @@ actual = test$bought
 
 # Committee
 
-```{r committee, warning = FALSE}
+```{r committee, warning = FALSE, cache=TRUE}
 set.seed(123)
+
+library(parallel)
+library(doParallel)
+cluster <- makeCluster(40) # convention to leave 1 core for OS
+registerDoParallel(cluster)
 
 ctrl = trainControl(
   method="boot",
@@ -56,13 +68,14 @@ ctrl = trainControl(
   savePredictions="final",
   classProbs=TRUE,
   index=createResample(train$bought, 10),
-  summaryFunction=twoClassSummary
+  summaryFunction=twoClassSummary,
+  allowParallel = TRUE
   )
 
 model_list <- caretList(
   bought~., data=train,
   trControl=ctrl,
-  methodList=c("naive_bayes", "rpart", "knn")
+  methodList=c("pls", "rpart")
 )
 
 ensemble_fit <- caretEnsemble(
@@ -79,30 +92,35 @@ ensemble_pred = predict(ensemble_fit, test)
 caret::confusionMatrix(data=ensemble_pred, reference=actual, positive=positive, dnn=c("Predicted", "Actual"))
 ```
 
-# Random Forests
+# Stacking
 
-```{r parrf, warning = FALSE}
+
+```{r stacking, cache=TRUE}
 set.seed(123)
-ctrl <- trainControl(method = "repeatedcv", 
-                     number = 10, repeats = 5, 
-                      classProbs = TRUE, returnResamp = "all", sampling="down")
 
-rf_grid <- expand.grid(.mtry = c(50, 100, 500))
+stack_fit <- caretStack(
+  model_list,
+  method="glm",
+  metric="ROC",
+  trControl=trainControl(
+    method="boot",
+    number=10,
+    savePredictions="final",
+    classProbs=TRUE,
+    summaryFunction=twoClassSummary
+  )
+)
+summary(stack_fit)
 
-rf_fit <- train(formula, data = train, "parRF",
-                  preProc=c('nzv', 'center', 'scale'),
-                  trControl = ctrl, tuneGrid = rf_grid, 
-                  metric="Kappa", allowParallel = TRUE)
+stack_pred = predict(stack_fit, test)
+caret::confusionMatrix(data=stack_pred, reference=actual, positive=positive, dnn=c("Predicted", "Actual"))
 
-summary(rf_fit)
 
-pred = predict(rf_fit, test)
-caret::confusionMatrix(data=rf_fit, reference=actual, positive=positive, dnn=c("Predicted", "Actual"))
 ```
 
 # Random Forests
 
-```{r rf, warning = FALSE}
+```{r rf, warning = FALSE, cache=TRUE}
 library(randomForest)
 set.seed(123) 
 rf2_fit = randomForest(formula, data=train, mtry=3, ntree=100, importance=TRUE)
@@ -117,10 +135,48 @@ varImpPlot(rf2_fit)
 
 # Boosting with Adaboost
 
-```{r adaboost, warning = FALSE}
+```{r adaboost, warning = FALSE, cache=TRUE}
 library(fastAdaboost)
 set.seed(123)
 boost = adaboost(formula, data=train, nIter=20)
 boost_pred = predict(boost, newdata=test)
-caret::confusionMatrix(data=boost_pred, reference=actual, positive=positive, dnn=c("Predicted", "Actual"))
+str(boost_pred)
+caret::confusionMatrix(data=boost_pred$class, reference=actual, positive=positive, dnn=c("Predicted", "Actual"))
 ```
+
+
+# Boosting with XGBoost
+
+```{r xgboost, warning = FALSE, cache=TRUE}
+library(xgboost)
+library(Matrix)
+set.seed(123)
+
+train_label = as.numeric(ifelse(train$bought == "yes", 1.0, 0.0))
+train_data = train
+dv = dummyVars(formula, train_data)
+train_data = predict(dv, train_data)
+train_data = Matrix(train_data, sparse=TRUE)
+
+
+test_label = as.numeric(ifelse(test$bought == "yes", 1.0, 0.0))
+test_data = test
+dv = dummyVars(formula, test_data)
+test_data = predict(dv, test_data)
+test_data = Matrix(test_data, sparse=TRUE)
+
+
+xgboost_fit <- xgboost(data = train_data,  label=train_label, nround=20, verbose=2, objective="binary:logistic")
+
+str(xgboost_fit)
+summary(xgboost_fit)
+
+xgboost_pred = predict(xgboost_fit, newdata=test_data)
+head(xgboost_pred)
+summary(xgboost_pred)
+xgboost_pred2 = as.factor(ifelse(xgboost_pred > 0.5, "yes", "no"))
+head(xgboost_pred2)
+head(test_label)
+caret::confusionMatrix(data=xgboost_pred2, reference=actual, positive=positive, dnn=c("Predicted", "Actual"))
+```
+
