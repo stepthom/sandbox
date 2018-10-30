@@ -1,5 +1,5 @@
 ---
-title: "Unbalanced HR"
+title: "Predicting Customer Churn: The Imbalanced HR Dataset"
 output: 
   html_document:
       toc: yes
@@ -7,9 +7,15 @@ output:
       code_folding: hide
 ---
 
-# Introduction
+# Situation
 
-Given the potential disruption to the work environment and the required resources to attract, acquire, and train new talent, understanding factors that influence employee attrition is important to human resource departments. In this exercise, we'll explore the IBM Human Resources Analytics dataset, which contains data on employee attrition (whether an employee will leave the company).  
+You are the Director of HR at a large multinational. Your boss - a VP who answers to the CEO - is concerned about employee churn over the last few years and wants you to fix it.
+
+You have tasked your elite data science team to figure out who's leaving and why. Better yet, to build a predictive model that can predict which employees are likely to leave. 
+
+Your lead data scientist hands you a report, below. The report outlines a number of different models, each with pros and cons. You must decide which to use. How do you proceed?
+
+# The Report
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
@@ -75,7 +81,7 @@ We train eight different models.
 - SMOTE. Same as Original, except new training data is artificially generated using the SMOTE method.
 - All. Same as Original, except the kappa metric is used during CV, and down sampling method is used.
 
-```{r}
+```{r, cache=TRUE}
 metric = "Accuracy"
 actual = test$Attrition
 formula = Attrition ~ .

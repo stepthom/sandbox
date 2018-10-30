@@ -7,3 +7,7 @@ arules.nb.html
 kiva*.docx
 kiva*.pdf
 .Rproj.user
+*.html
+*_cache
+*_files
+*.zip
