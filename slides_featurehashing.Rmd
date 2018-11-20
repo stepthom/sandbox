@@ -1,0 +1,166 @@
+---
+title: "Feature Hashing"
+author: "Dr. Stephen W. Thomas, Queen's University"
+output:
+  pdf_document:
+    highlight: pygments
+    number_sections: yes
+    toc: no
+    toc_depth: '2'
+---
+
+
+
+```{r}
+library(FeatureHashing)
+library(dplyr)
+```
+
+
+```{r}
+diabetes <- read.csv("data/diabetic_data.csv", stringsAsFactors = FALSE)
+
+
+# quick look at the data
+str(diabetes)
+
+# drop useless variables
+diabetes <- subset(diabetes,select=-c(encounter_id, patient_nbr))
+
+# transform all "?" to 0s
+diabetes[diabetes == "?"] <- NA
+
+# remove zero variance - ty James http://stackoverflow.com/questions/8805298/quickly-remove-zero-variance-variables-from-a-data-frame
+diabetes <- diabetes[sapply(diabetes, function(x) length(levels(factor(x,exclude=NULL)))>1)]
+
+# prep outcome variable to those readmitted under 30 days
+diabetes$readmitted <- ifelse(diabetes$readmitted == "<30",1,0)
+
+# generalize outcome name
+outcomeName <- 'readmitted'
+
+# large factors to deal with
+length(unique(diabetes$diag_1))
+length(unique(diabetes$diag_2))
+length(unique(diabetes$diag_3))
+```
+
+
+
+```{r}
+# dummy var version -------------------------------------------------------
+diabetes_dummy <- diabetes
+# alwasy a good excersize to see the length of data that will need to be transformed
+# charcolumns <- names(diabetes_dummy[sapply(diabetes_dummy, is.character)])
+# for (thecol in charcolumns) 
+#         print(paste(thecol,length(unique(diabetes_dummy[,thecol]))))
+
+# warning will need 2GB at least free memory
+require(caret)
+dmy <- dummyVars(" ~ .", data = diabetes_dummy)
+diabetes_dummy <- data.frame(predict(dmy, newdata = diabetes_dummy))
+
+# many features
+dim(diabetes_dummy)
+
+# change all NAs to 0
+diabetes_dummy[is.na(diabetes_dummy)] <- 0
+
+# split the data into training and testing data sets
+set.seed(1234)
+split <- sample(nrow(diabetes_dummy), floor(0.5*nrow(diabetes_dummy)))
+objTrain <-diabetes_dummy[split,]
+objTest <- diabetes_dummy[-split,]
+
+predictorNames <- setdiff(names(diabetes_dummy),outcomeName)
+
+# cv.glmnet expects a matrix 
+library(glmnet)
+# straight matrix model not recommended - works but very slow, go with a sparse matrix
+# glmnetModel <- cv.glmnet(model.matrix(~., data=objTrain[,predictorNames]), objTrain[,outcomeName], 
+#             family = "binomial", type.measure = "auc")
+
+glmnetModel <- cv.glmnet(sparse.model.matrix(~., data=objTrain[,predictorNames]), objTrain[,outcomeName], 
+                         family = "binomial", type.measure = "auc")
+glmnetPredict <- predict(glmnetModel,sparse.model.matrix(~., data=objTest[,predictorNames]), s="lambda.min")
+
+# dummy version score:
+auc(objTest[,outcomeName], glmnetPredict)
+```
+
+
+
+```{r}
+# feature hashed version -------------------------------------------------
+diabetes_hash <- diabetes
+predictorNames <- setdiff(names(diabetes_hash),outcomeName)
+
+
+# change all NAs to 0
+diabetes_hash[is.na(diabetes_hash)] <- 0
+
+set.seed(1234)
+split <- sample(nrow(diabetes_hash), floor(0.5*nrow(diabetes_hash)))
+objTrain <-diabetes_hash[split,]
+objTest <- diabetes_hash[-split,]
+
+dim(objTrain)
+head(objTrain)
+```
+ 
+ 
+```{r}
+set.seed(123)
+
+idx = which(objTrain$race == "Asian")[1:3]
+idx = c(idx, which(objTrain$race == "Hispanic")[1:3])
+idx = c(idx, which(objTrain$race == "Other")[1:3])
+idx = c(idx, which(objTrain$race == "0")[1:3])
+idx = c(idx, which(objTrain$race == "AfricanAmerican")[1:3])
+idx = c(idx, which(objTrain$race == "Caucasian")[1:3])
+df = objTrain[idx,]
+df$readmitted = sample(c(0, 1), replace=T, size=nrow(df))
+df
+colnames(df)
+
+df1 = df %>% select(race)
+df1_hashed = hashed.model.matrix(~ . -1, data=df1, hash.size=2^3, transpose=FALSE, create.mapping = TRUE)
+df1_all = cbind(df1, as.matrix(df1_hashed))
+hash.mapping(df1_hashed)
+print("")
+
+df2 = df %>% select(race, gender)
+df2_hashed = hashed.model.matrix(~ . -1, data=df2, hash.size=2^3, transpose=FALSE, create.mapping = TRUE)
+df2_all = cbind(df2, as.matrix(df2_hashed))
+hash.mapping(df2_hashed)
+print("")
+
+df3 = df %>% select(race, gender, age)
+df3_hashed = hashed.model.matrix(~ . -1, data=df3, hash.size=2^3, transpose=FALSE, create.mapping = TRUE)
+df3_all = cbind(df3, as.matrix(df3_hashed))
+hash.mapping(df3_hashed)
+```
+ 
+```{r}
+library(FeatureHashing)
+objTrain_hashed = hashed.model.matrix(~., data=objTrain[,predictorNames], hash.size=2^12, transpose=FALSE)
+objTrain_hashed = as(objTrain_hashed, "dgCMatrix")
+objTest_hashed = hashed.model.matrix(~., data=objTest[,predictorNames], hash.size=2^12, transpose=FALSE)
+objTest_hashed = as(objTest_hashed, "dgCMatrix")
+
+str(objTrain_hashed)
+dim(objTrain_hashed)
+sort(objTrain_hashed[2,], decreasing=T)[1:20]
+sort(objTrain_hashed[3,], decreasing=T)[1:20]
+sort(objTrain_hashed[300,], decreasing=T)[1:20]
+```
+
+```{r}
+ 
+library(glmnet)
+glmnetModel <- cv.glmnet(objTrain_hashed, objTrain[,outcomeName], 
+                     family = "binomial", type.measure = "auc")
+# hashed version score:
+glmnetPredict <- predict(glmnetModel, objTest_hashed, s="lambda.min")
+auc(objTest[,outcomeName], glmnetPredict)
+```
