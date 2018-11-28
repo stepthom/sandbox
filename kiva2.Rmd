@@ -1,0 +1,396 @@
+---
+title: 'Using Text Analytics to Predict Loan Defaults'
+subtitle: "A case study of Kiva"
+author: "Dr. Stephen W. Thomas, Smith School of Business, Queen's University"
+date: "January 2018"
+documentclass: article
+fontsize: 11pt
+output:
+  html_document:
+   toc: yes
+   toc_float: yes
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(warning=FALSE, message=FALSE, fig.align='center', error=TRUE)
+```
+
+```{r}
+library(tidyverse)
+#library(ggthemes)
+#library(scales)
+library(rpart)
+#library(rpart.plot)
+#library(RColorBrewer)
+library(MLmetrics)
+library(topicmodels)
+library(tidytext)
+library(knitr)
+#library(kableExtra)
+library(textmineR)
+library(stringr)
+library(caret)
+```
+
+
+
+# Loading the Data
+
+
+```{r loaddata, include=FALSE, cache=TRUE}
+df <- read_csv("data/kiva.csv")
+df = df %>%
+  rename(story = en)
+```
+
+
+```{r, include=FALSE}
+str(df)
+df$id = 1:nrow(df)
+df$status = as.factor(df$status)
+df$sector = as.factor(df$sector)
+df$country = as.factor(df$country)
+df$gender = as.factor(df$gender)
+df$nonpayment = as.factor(df$nonpayment)
+```
+
+Let's look at a sample of our data.
+
+```{r, include=FALSE, eval=FALSE}
+head(df, n=20)
+summary(df)
+```
+
+# Data Cleaning
+
+```{r clean, include=FALSE, cache=TRUE}
+# Remove HTML Tags
+df = df %>% 
+  mutate(story = gsub("<.*?>", "", story))
+```
+
+Remove
+
+
+
+Mifex offers its clients microinsurance and access to business training and educational programs. For more information about microfinance, Ecuador, and    our services, please visit www.mifex.org.
+
+Translated     from Spanish by Isabel Tan, a Kiva volunteer.
+
+nDisclaimer: Due to recent events in       Kenya, the security situation in many communities remains unsettled, affecting many local businesses. Lenders to this entrepreneur should be aware that this loan may represent a    higher default risk, and should be willing to accept this additional risk in making their loan.
+
+Note: Maria is one of five microentrepreneurs in her Bank of Hope solidarity group, all of whom have gone through           Esperanza's business training courses. Each of the five members will receive a share of this $800 loan for their respective businesses and will be accountable to each other for     repaying their share of this loan together. This group-lending method strengthens social needs in the community and helps ensure that members cooperate to help one another repay    their loans
+and invest wisely in their businesses and families.
+
+Pictured are these five members of "Jesus Nuestra Esperanza" along with their loan officer and two other members  of Jesus Nuestra Esperanza.\n\nOn behalf of Maria Binet, Jesus Nuestra Esperanza, and all of us here at Esperanza International, thank you for your interest and support in fighting the global issue of poverty!\n\n\nNote -  As there are eight people in this picture, we wanted to specify who the additional individuals are: The gentleman on the far right is the  group's loan
+officer. In the back row, the first and third people from the left are members of another Esperanza International sub-group, but are not borrowers of this loan.  Thank you!
+
+About KADET:\r\nThe Kenya Agency for the Development of Enterprise and      Technology (KADET) is committed to economically empowering its clients by providing financial services to rural communities in order to relieve suffering and improve living         conditions within those communities.
+
+duplicate descriptions - remove before building topic model?
+
+```{r}
+dim(df)
+df = distinct(df, story, .keep_all = TRUE)
+dim(df)
+
+idx = grep("Translated from Spanish", df$story)
+idx
+df$story[idx[1]]
+df$story = gsub("Translated from Spanish.*Kiva volunteer", " ", df$story, ignore.case=TRUE)
+grep("Translated from Spanish", df$story)
+
+grep("Mifex offers", df$story)
+df$story = gsub("Mifex offers.*www.mifex.org", " ", df$story, ignore.case=TRUE)
+grep("Mifex offers", df$story)
+
+df$story = gsub("About KADET:.*within those communities", " ", df$story, ignore.case=TRUE)
+df$story = gsub("Disclaimer: Due to recent events in.*making their loan.", " ", df$story, ignore.case=TRUE)
+
+```
+
+
+
+
+
+## Latent Dirichlet Allocation
+
+Let's use a technique called Latent Dirichlet Allocation (LDA) to extract the topics from each document.
+
+# Feature Engineering
+```{r ngrams}
+require(quanteda)
+topfeatures(dfm(df$story, ngrams = 1, verbose = FALSE), n=50)
+topfeatures(dfm(df$story, ngrams = 2, verbose = FALSE), n=50)
+topfeatures(dfm(df$story, ngrams = 3, verbose = FALSE), n=50)
+topfeatures(dfm(df$story, ngrams = 4, verbose = FALSE), n=50)
+topfeatures(dfm(df$story, ngrams = 5, verbose = FALSE), n=50)
+topfeatures(dfm(df$story, ngrams = 6, verbose = FALSE), n=50)
+topfeatures(dfm(df$story, ngrams = 7, verbose = FALSE), n=50)
+topfeatures(dfm(df$story, ngrams = 8, verbose = FALSE), n=50)
+topfeatures(dfm(df$story, ngrams = 9, verbose = FALSE), n=50)
+topfeatures(dfm(df$story, ngrams = 10, verbose = FALSE), n=50)
+topfeatures(dfm(df$story, ngrams = 20, verbose = FALSE), n=50)
+```
+
+```{r buildtdm, cache=TRUE}
+dtm <- CreateDtm(doc_vec = df$story, # character vector of documents
+                 doc_names = df$id, # document names
+                 ngram_window = c(1, 2), # minimum and maximum n-gram length
+                 stopword_vec = c(tm::stopwords("english"), # stopwords from tm
+                                  tm::stopwords("french"), # stopwords from tm
+                                  tm::stopwords("spanish"), # stopwords from tm
+                                  tm::stopwords("SMART")), # this is the default value
+                 lower = TRUE, # lowercase - this is the default value
+                 remove_punctuation = TRUE, # punctuation - this is the default
+                 remove_numbers = TRUE, # numbers - this is the default
+                 verbose = FALSE, # Turn off status bar for this demo,
+                 stem_lemma_function = function(x) SnowballC::wordStem(x, "porter"),
+                 cpus = 20) # default is all available cpus on the system
+
+
+# Filter rare words
+dim(dtm)
+dtm <- dtm[ , colSums(dtm > 0) > 50 ]
+dim(dtm)
+ 
+
+dim(dtm)
+max_num = nrow(dtm) * 0.3
+max_num
+dtm <- dtm[ , colSums(dtm > 0) <= max_num ]
+dim(dtm)
+
+# Capture how long each document is
+df$doc_lengths = rowSums(dtm)
+```
+
+
+```{r}
+summary(df$doc_lengths)
+```
+
+Most frequent terms.
+```{r}
+tf_mat <- TermDocFreq(dtm = dtm)
+head(tf_mat[ order(tf_mat$term_freq, decreasing = TRUE) , ], 50)
+```
+Highest IDF
+```{r}
+head(tf_mat[ order(tf_mat$idf, decreasing = TRUE) , ], 50)
+```
+
+Least frequent terms.
+
+```{r}
+head(tf_mat[ order(tf_mat$term_freq, decreasing = FALSE) , ], 50)
+```
+
+Most frequent bigrams.
+```{r}
+# look at the most frequent bigrams
+tf_bigrams <- tf_mat[ stringr::str_detect(tf_mat$term, "_") , ]
+head(tf_bigrams[ order(tf_bigrams$term_freq, decreasing = TRUE) , ], 50)
+```
+
+```{r runlda, cache=TRUE, error=TRUE}
+model <- FitLdaModel(dtm = dtm, 
+                     k = 20, 
+                     iterations = 500, # i recommend a larger value, 500 or more
+                     burnin = 180,
+                     optimize_alpha = TRUE,
+                     calc_likelihood = TRUE,
+                     calc_coherence = TRUE,
+                     calc_r2 = TRUE,
+                     alpha = 0.1, # this is the default value
+                     beta = 0.05, # this is the default value
+                     cpus = 21) # Note, this is for a big machine  
+
+plot(model$log_likelihood, type = "l")
+```
+
+## Inspect the topics
+
+```{r inspect}
+model$top_terms <- GetTopTerms(phi = model$phi, M = 8)
+head(model$top_terms) 
+
+# probabilistic coherence, a measure of topic quality
+# this measure can be used with any topic model, not just probabilistic ones
+model$coherence <- CalcProbCoherence(phi = model$phi, dtm = dtm, M = 5)
+
+# Get the prevalence of each topic
+# You can make this discrete by applying a threshold, say 0.05, for
+# topics in/out of docuemnts. 
+model$prevalence <- colSums(model$theta) / sum(model$theta) * 100
+
+
+# textmineR has a naive topic labeling tool based on probable bigrams
+model$labels <- LabelTopics(assignments = model$theta > 0.20, 
+                            dtm = dtm,
+                            M = 2)
+
+head(model$labels)
+
+
+# put them together, with coherence into a summary table
+model$summary <- data.frame(topic = rownames(model$phi),
+                            label = model$labels,
+                            coherence = round(model$coherence, 2),
+                            prevalence = round(model$prevalence,1),
+                            top_terms = apply(model$top_terms, 2, function(x){
+                              paste(x, collapse = ", ")
+                            }),
+                            stringsAsFactors = FALSE)
+
+model$summary %>%
+  arrange(-prevalence)
+```
+
+## Add the topic embeddings to the main dataframe
+
+```{r}
+df = cbind(df, round(model$theta, digits=2))
+```
+
+## Show some top docs for each topic
+```{r}
+colnames(df)
+for (i in 1:50){
+    print(paste("Topic", i))
+    sub = df %>%
+    arrange_(paste("t_", i, sep="")) %>%
+    tail(n=8)
+    print(sub)
+}
+
+
+```
+
+```{r runctm, cache=TRUE, error=TRUE}
+cmodel <- FitCtmModel(dtm = dtm, 
+                     k = 20, 
+                     iterations = 500, # i recommend a larger value, 500 or more
+                     calc_r2 = TRUE,
+                     cpus = 21) # Note, this is for a big machine  
+cmodel$top_terms <- GetTopTerms(phi = cmodel$phi, M = 8)
+head(cmodel$top_terms) 
+
+```
+## Model 1 (No text)
+
+Below is the model that was created from only the original numerical and categorical variables.
+
+```{r fig.height=2.5}
+set.seed(123)
+df_new = df
+# Don't want to use either of these for prediction, and the - sign doesn't work
+# with rpart forumulas.
+df_notext = subset(df_new, select=c(status, sector, country, gender, loan_amount, nonpayment))
+
+# Split the data into training and testing.
+train_notext <- sample_frac(df_notext, 0.8)
+test_notext <- setdiff(df_notext, train_notext)
+
+
+# Let's train the model.
+form = as.formula(status ~ .)
+tree <- rpart(form, train_notext, method="class")
+tree
+rpart.plot(tree, extra=2)
+```
+
+
+
+The following table summarizes the predictions of the decision on testing data.
+
+```{r, eval=TRUE, inculde=FALSE}
+predicted = predict(tree, test_notext, type="class")
+actual = test_notext$status
+caret::confusionMatrix(data=predicted, reference=actual, positive="defaulted", dnn=c("Predicted", "Actual"))
+preds = data.frame((table(predicted, actual))) %>%
+  spread(actual, Freq) %>%
+  mutate(total = defaulted + paid) %>%
+  select(predicted, total, everything())
+preds
+```
+
+## Model 2 (With Text)
+
+Below is the model that was created from all variables in the dataset.
+
+
+```{r fig.height=3.0}
+set.seed(123)
+# Don't want to use either of these for prediction, and the - sign doesn't work
+# with rpart forumulas.
+df_text = subset(df_new, select=c(-id, -story))
+
+# Split the data into training and testing.
+train_text <- sample_frac(df_text, 0.8)
+test_text <- setdiff(df_text, train_text)
+
+
+# Let's create the model.
+form = as.formula(status ~ .)
+tree.text <- rpart(form, train_text, method="class")
+tree.text
+rpart.plot(tree.text, extra=2)
+```
+
+
+
+Below is a summary of its predictions:
+
+```{r, include=FALSE}
+
+predicted.text = predict(tree.text, test_text, type="class")
+actual.text = test_text$status
+caret::confusionMatrix(data=predicted.text, reference=actual.text, positive="defaulted", dnn=c("Predicted", "Actual"))
+preds.text = data.frame((table(predicted.text, actual.text))) %>%
+  spread(actual.text, Freq) %>%
+  mutate(total = defaulted + paid) %>%
+  select(predicted.text, total, everything())
+preds.text
+```
+
+
+## Metrics
+
+Below is the accuracy and other metrics of the two models.
+
+```{r}
+bb = data.frame(Metric=c("Accuracy", "Precision", "Recall", "F1 Score", "Sensitivity", "Specificity"),
+                "Model_1" =c(Accuracy(y_true=actual, y_pred=predicted),
+                        Precision(y_true=actual, y_pred=predicted),
+                        Recall(y_true=actual, y_pred=predicted),
+                        F1_Score(predicted, actual),
+                        Sensitivity(y_true=actual, y_pred=predicted),
+                        Specificity(y_true=predicted, y_pred=actual)),
+                "Model_2" =  c(Accuracy(y_true=actual.text, y_pred=predicted.text),
+                        Precision(y_true=actual.text, y_pred=predicted.text),
+                        Recall(y_true=actual.text, y_pred=predicted.text),
+                        F1_Score(predicted.text, actual.text),
+                        Sensitivity(y_true=actual.text, y_pred=predicted.text),
+                        Specificity(y_true=predicted.text, y_pred=actual.text)))
+
+bb
+```
+
+
+## Caret
+
+```{r caret}
+set.seed(123)
+ctrl = trainControl(method = "repeatedcv", 
+                    number = 10, repeats = 5, classProbs = TRUE, allowParallel = TRUE)
+dt_fit <- train(form, data = train_text, "rpart", trControl = ctrl, tuneLength=9, metric="Kappa")
+dt_pred = predict(dt_fit, test_text)
+caret::confusionMatrix(data=dt_pred, reference=actual.text, positive="defaulted", dnn=c("Predicted", "Actual"))
+
+
+rf_fit <- train(form, data = train_text, "parRF",  preProc=c('nzv', 'center', 'scale'), trControl = ctrl, tuneLength=9, metric="Kappa")
+rf_pred = predict(rf_fit, test_text)
+caret::confusionMatrix(data=rf_pred, reference=actual.text, positive="defaulted", dnn=c("Predicted", "Actual"))
+
+```
