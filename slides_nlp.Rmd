@@ -1,0 +1,117 @@
+---
+title: "Data and code for NLP"
+author: "Dr. Stephen W. Thomas, Queen's University"
+output:
+  html_document:
+      code_folding: hide
+---
+
+```{r}
+options(java.parameters = "- Xmx1024m") # Necessary of openNLP POS tagger
+
+
+#install.packages("https://datacube.wu.ac.at/src/contrib/openNLPmodels.en_1.5-1.tar.gz", repos=NULL)
+library(dplyr)
+library(openNLP)
+library(openNLPdata)
+library(openNLPmodels.en)
+library(NLP)
+gc()
+```
+
+# Helper Function
+
+```{r}
+# Inspiration from: https://rpubs.com/lmullen/nlp-chapter
+
+# Extract entities from an AnnotatedPlainTextDocument
+entities <- function(doc, kind="entity") {
+  s <- doc$content
+  a <- annotations(doc)[[1]]
+  if(hasArg(kind)) {
+    k <- sapply(a$features, `[[`, "kind")
+    s[a[k == kind]]
+  } else {
+    s[a[a$type == "entity"]]
+  }
+}
+
+```
+
+```{r}
+k1 = as.String("Martha and her husband own a metal workshop where they make stands and furniture. She runs the administrative part of the business while her husband is in charge of production. They started this operation about 8 years ago. At the time, her husband would only make furniture out of wood, but he got a customer that asked him to make a tv stand out of metal. Because he had some experience with metalwork he took the job. Once he finished, he realized that working with metal was much faster and easier than wood and therefore more profitable. Today they have four employees (3 of them pictured next to Martha) that work with them and get paid by commission. They sell most of their products in their community and also in nearby rural towns. They have borrowed from Kiva and Mifex before, using their loan to purchase raw materials necessary for their production. They have opened small stores in their home where they sell groceries and other items, but plan to continue pouring their loan capital into their furniture making business which is the most profitable. Martha is 28 years old and has 2 small children. Her husband is a hard working family man who has dedicated most of his time and efforts to this microenterprise. They are very proud of their business and hope it will continue to grow with the help of a loan from the international community.")
+
+
+k2 = as.String("Cristina owns and operates a grocery store in La Vega which she started fifteen years ago. Cristina was born in La Romana and is 28 years old, and she and her husband have three children, who attend school. Last year, Cristina took a loan from FSMA, which she invested in cooling equipment. Cristina repeaid the loan in four months. She has moved her business downown. The experienced businesswoman is requesting a second loan to replenish her store. Cristina explains that the grocery store is the main source of income for the family, and she has to work a lot to help her husband with family issues and support the children's studies.")
+
+k3 = as.String("Joe Smith is 58 years old.")
+
+k4 = as.String("Joe Smith works at Google.")
+
+k5 = as.String("Joe Smith is best friends with Steve Thomas.")
+
+s1 <- paste(c("Pierre Vinken, 61 years old, will join the board as a ",
+    "nonexecutive director Nov. 29.\n",
+    "Mr. Vinken is chairman of Elsevier N.V., ",
+    "the Dutch publishing group."),
+  collapse = "")
+s1 <- as.String(s1)
+```
+
+```{r}
+word_ann <- Maxent_Word_Token_Annotator()
+sent_ann <- Maxent_Sent_Token_Annotator()
+
+pos_ann <- Maxent_POS_Tag_Annotator()
+
+person_ann <- Maxent_Entity_Annotator(kind = "person")
+location_ann <- Maxent_Entity_Annotator(kind = "location")
+organization_ann <- Maxent_Entity_Annotator(kind = "organization")
+date_ann <- Maxent_Entity_Annotator(kind = "date")
+money_ann <- Maxent_Entity_Annotator(kind = "money")
+percentage_ann <- Maxent_Entity_Annotator(kind = "percentage")
+
+pipeline <- list(sent_ann,
+                 word_ann,
+                 pos_ann,
+                 person_ann,
+                 location_ann,
+                 organization_ann,
+                 date_ann,
+                 money_ann,
+                 percentage_ann)
+```
+
+
+```{r}
+s = k3
+s_annotations <- annotate(s, pipeline)
+s_doc <- AnnotatedPlainTextDocument(s, s_annotations)
+
+s_annotations
+entities(s_doc, kind = "person")
+entities(s_doc, kind = "location")
+entities(s_doc, kind = "organization")
+entities(s_doc, kind = "date")
+entities(s_doc, kind = "money")
+entities(s_doc, kind = "percentage")
+```
+
+```{r}
+s <- paste(c("Pierre Vinken, 61 years old, will join the board as a ",
+    "nonexecutive director Nov. 29.\n",
+    "Mr. Vinken is chairman of Elsevier N.V., ",
+    "the Dutch publishing group."),
+  collapse = "")
+s <- as.String(s)
+s
+## Chunking needs word token annotations with POS tags.
+sent_token_annotator <- Maxent_Sent_Token_Annotator()
+word_token_annotator <- Maxent_Word_Token_Annotator()
+pos_tag_annotator <- Maxent_POS_Tag_Annotator()
+a3 <- annotate(s, list(sent_token_annotator,
+                        word_token_annotator,
+                        pos_tag_annotator))
+annotate(s, Maxent_Chunk_Annotator(), a3)
+aa = annotate(s, Maxent_Chunk_Annotator(probs = TRUE), a3)
+```
