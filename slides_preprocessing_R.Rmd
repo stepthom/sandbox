@@ -12,7 +12,9 @@ output:
     toc: no
     toc_depth: '2'
 ---
-
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(warning=FALSE, message=FALSE, fig.align='center', error=TRUE)
+```
 
 
 ```{r}
@@ -22,6 +24,8 @@ library(readr)
 library(tm)
 library(qdap)
 library(ngram)
+library(knitr)
+library(kableExtra)
 ```
 
 
@@ -63,48 +67,43 @@ tokenizers::tokenize_words("(613) 453-6162", lowercase=F)
 # N-Grams
 
 ```{r}
+library(ngram)
 ng = ngram::ngram("Hey there, I'm awesome.", n=2)
 print(ng, output="full")
-
 ```
 
 
 
-# Removing Characters
+# Removing Characters and Numbers
 
 ```{r}
-# Removing punctuation
+library(tm)
 tm::removePunctuation("Hey! Let's go to the bar...")
 
-# Removing special characters
-astr <- "Ábcdêãçoàúü"
-iconv(astr, to = "ASCII//TRANSLIT")
-```
+s1 <- "Ábcdêãçoàúü"
+base::iconv(s1, to = "ASCII//TRANSLIT")
 
-
-# Removing Numbers
-
-```{r}
 tm::removeNumbers("There are only 4 classes left.")
-
 ```
 
 # Regular Expressions
 
 ```{r}
-story=c(
-  "Alejandrina has a small store in her house where she sells basic products [such as soap, cooking oil, eggs, etc.] and stationary products. Alejandrina started her business with the help of her husband and with $. of capital. Translated from Spanish by Jennifer Day, Kiva Volunteer.",
-  "Nancy works as a saleswoman, her main product being used clothing. She buys packs of clothes and resells them to friends and neighbors. She began her business with her family's help, who live abroad and sent her her first shipment of clothes. At the beginning, she only sold used clothing items. Now she sells new clothing as well as cosmetics.Translated from Spanish by Kiva Volunteer, Kristin Connor.",
-  "Marjorie sells lunch to companies and construction workers. He started her business  years ago with the help of her sister who lent her money for starting up. Her sister also helped her to find customers. \r\n\r\nIn the beginning, she only sold lunch. Translated by Ramn F. Kolb.")
+s1 = "Alejandrina has a small store in her house where she sells basic products. Translated from Spanish by Jennifer Day, Kiva Volunteer."
+base::gsub("Translated[^\\.]+\\.", " ", s1, ignore.case=TRUE)
 
-gsub("Translated[^\\.]+\\.", " ", story, ignore.case=TRUE)
+s2 = "Nancy works as a saleswoman, her main product being used clothing.Translated from Spanish by Kiva Volunteer, Kristin Connor."
+base::gsub("Translated[^\\.]+\\.", " ", s2, ignore.case=TRUE)
+
+s3 = "Marjorie sells lunch to companies and construction workers. Translated by Ramn F. Kolb."
+base::gsub("Translated[^\\.]+\\.", " ", s3, ignore.case=TRUE)
 ```
-
 
 
 # Stemming
 
 ```{r}
+library(qdap)
 qdap::stemmer("We are writing code like hackers.", capitalize = FALSE)
 ```
 
@@ -112,13 +111,31 @@ qdap::stemmer("We are writing code like hackers.", capitalize = FALSE)
 
 Can use textstem::lemmatize_words or koRpus::treetag
 
+
 ```{r}
+library(textstem)
+library(SnowballC)
+
+words = c('caresses', 'flies', 'dies', 'mules', 'denied',
+            'died', 'agreed', 'owned', 'humbled', 'sized',
+            'meeting', 'stating', 'itemization',
+            'sensational', 'traditional', 'reference', 'colonizer',
+            'plotted', 'generously', 'crying')
+
+res = data.frame(Orig = words, 
+                 Porter = textstem::stem_words(words, language="porter"),
+                 Snowball = SnowballC::wordStem(words),
+                 Lemma = lemmatize_words(words))
+res %>% kable()
+```
+
+```{r, eval=F}
+# Not working on my machine right now; set eval to false
 library(koRpus)
 tagged.results <- treetag(c("run", "ran", "running"), treetagger="manual", format="obj",
                       TT.tknz=FALSE , lang="en",
                       TT.options=list(path="./TreeTagger", preset="en"))
 tagged.results@TT.res
-
 ```
 
 # Spell Checking
@@ -127,13 +144,12 @@ Hunspell is the spell checker library used by LibreOffice, OpenOffice, Mozilla F
 
 ```{r}
 library(hunspell)
-
 hunspell_check(c("beer", "wiskey", "wine"))
-
 hunspell_suggest("wiskey")
 ```
 
 ```{r}
+library(qdap)
 qdap::check_spelling("This is not spelld correcly.")
 ```
 
@@ -141,27 +157,33 @@ qdap::check_spelling("This is not spelld correcly.")
 # Stopping
 
 ```{r}
+library(qdap)
 qdap::rm_stop("My name is Steve, and I am a good chef.", stopwords = qdapDictionaries::Top200Words)
+sort(qdapDictionaries::Top200Words)
 ```
 
 
 # Removing Rare Words
 
 ```{r}
+library(tm)
 myText <- c("the quick brown furry fox jumped over a second furry brown fox",
               "the sparse brown furry matrix",
               "the quick matrix")
 
-require(tm)
 myVCorpus <- VCorpus(VectorSource(myText))
 myTdm <- DocumentTermMatrix(myVCorpus)
 as.matrix(myTdm)
 as.matrix(removeSparseTerms(myTdm, .01))
 as.matrix(removeSparseTerms(myTdm, .99))
 as.matrix(removeSparseTerms(myTdm, .5))
+```
 
-   
-require(quanteda)
+```{r}
+library(quanteda)
+myText <- c("the quick brown furry fox jumped over a second furry brown fox",
+              "the sparse brown furry matrix",
+              "the quick matrix")
 myDfm <- dfm(myText, verbose = FALSE)
 docfreq(myDfm)
 dfm_trim(myDfm, min_count = 2)
@@ -172,11 +194,13 @@ dfm_trim(myDfm, min_count = 2)
 With textmineR:
 
 ```{r}
+library(textmineR)
+
 df = data.frame(ID = 1:3, 
                 Text=c("My dog ate my homework.", 
                         "The cat ate my sandwich.", 
                         "A dolphin ate the homework and the sandwich."))
-library(textmineR)
+
 dtm <- textmineR::CreateDtm(doc_vec = df$Text,
                  doc_names = df$ID, 
                  ngram_window = c(1, 2), 
@@ -192,6 +216,29 @@ dtm <- textmineR::CreateDtm(doc_vec = df$Text,
 as.data.frame(as.matrix(dtm), stringsAsFactors=False)
 ```
 
+With TM:
+
+```{r}
+library(tm)
+
+myText <- c("the quick brown furry fox jumped over a second furry brown fox",
+              "the sparse brown furry matrix",
+              "the quick matrix")
+
+myVCorpus <- VCorpus(VectorSource(myText))
+
+myVCorpus <- tm_map(myVCorpus, content_transformer(tolower))
+myVCorpus <- tm_map(myVCorpus, content_transformer(removePunctuation))
+myVCorpus <- tm_map(myVCorpus, content_transformer(removeNumbers))
+myVCorpus <- tm_map(myVCorpus, content_transformer(removeWords), stopwords("english"))
+myVCorpus <- tm_map(myVCorpus, content_transformer(stripWhitespace))
+
+dtm <- DocumentTermMatrix(myVCorpus)
+as.matrix(dtm)
+dtm <- removeSparseTerms(dtm, 0.5)
+as.matrix(dtm)
+```
+
 # R Data Types and Formats
 
 ```{r}
@@ -204,7 +251,7 @@ df = data.frame(ID = 1:3,
 
 
 ```{r}
-require(tm)
+library(tm)
 myVCorpus <- VCorpus(VectorSource(myText))
 dtm <- DocumentTermMatrix(myVCorpus)
 str(dtm)
@@ -213,7 +260,7 @@ dim(dtm)
 
 
 ```{r}
-require(textmineR)
+library(textmineR)
 dtm <- textmineR::CreateDtm(doc_vec = df$Text, doc_names = df$ID)
 str(dtm)
 dim(dtm)
@@ -221,7 +268,7 @@ dim(dtm)
 
 
 ```{r}
-require(text2vec) 
+library(text2vec) 
 prep_fun = tolower
 tok_fun = word_tokenizer
 
@@ -247,12 +294,11 @@ dtm_h = create_dtm(it_train, h_vectorizer)
 str(dtm_h)
 dim(dtm_h)
 as.data.frame(as.matrix(dtm_h))
-
 ```
 
 
 ```{r}
-require(tidytext)
+library(tidytext)
 tidy <- df %>% 
   unnest_tokens(word, Text)
 
@@ -267,73 +313,52 @@ Good research article: https://journal.r-project.org/archive/2014-1/loo.pdf
 Also see fuzzywuzzyR.
 
 ```{r}
-good_names <- data.frame(
-  name = c('Queen\'s University', 'University of Toronto', 'McGill University', 'University Of Waterloo'),
-  location = c("Kingston, ON", "Toronto, ON", "Montreal, QB", "Waterloo, ON"))
+library(fuzzyjoin)
+library(dplyr)
 
-b <- data.frame(name = c('Queens University', 'Queen\'s', 'Queens Univrsity',
+choices <- data.frame(
+  name = c('Queen\'s University', 'University of Toronto', 
+           'McGill University', 'University Of Waterloo'))
+
+typos <- data.frame(name = c('Queens University', 'Queen\'s', 'Queens Univrsity',
                          'U of T', 'Toronto', 'Rotman',
                          'Mcgill', 'McGill U.',
                          'Waterloo', 'Waterloop University'))
 
-library(fuzzyjoin)
-library(dplyr)
-
-res = stringdist_join(b, good_names, 
-                by = "name",
-                mode = "left",
-                ignore_case = TRUE, 
-                method = "jw", 
-                max_dist = 99, 
-                distance_col = "dist") %>%
+stringdist_join(typos, choices, by = "name", mode = "left", ignore_case = TRUE, 
+                method = "jw", max_dist = 99, distance_col = "dist") %>%
   group_by(name.x) %>%
   top_n(1, -dist) 
-
-res
-
-res %>%
-  write.csv("out/fuzzy_matches.csv")
 ```
 
 # Vectorization
 
 Use text2vec to compare BOW to feature hashing embeddings on Kiva Dataset
 
-
 ```{r}
-require(textclean)
-require(tidyverse)
-require(rpart)
-require(rpart.plot)
-require(text2vec) 
-
 df <- read_csv("data/kiva.csv")
 df = df %>%
   rename(story = en) %>%
   mutate(story = gsub("<.*?>", "", story)) %>% # Remove HTML tags
   mutate(story = gsub("\\d", "", story)) # Remove digits
+```
 
+```{r}
+library(textclean)
+library(tidyverse)
+library(text2vec) 
 
-df$id = 1:nrow(df)
-df$status = as.factor(df$status)
-df$sector = as.factor(df$sector)
-df$country = as.factor(df$country)
-df$gender = as.factor(df$gender)
-df$nonpayment = as.factor(df$nonpayment)
-
-prep_fun = tolower
-tok_fun = word_tokenizer
 
 it_train = itoken(df$story, 
-             preprocessor = prep_fun, 
-             tokenizer = tok_fun, 
+             preprocessor = tolower, 
+             tokenizer = word_tokenizer, 
              ids = df$id, 
              progressbar = FALSE)
 vocab = create_vocabulary(it_train, ngram = c(1L, 3L))
 pruned_vocab = prune_vocabulary(vocab, 
                                  term_count_min = 10, 
                                  doc_proportion_max = 0.5,
-                                 doc_proportion_min = 0.01)
+                                 doc_proportion_min = 0.05)
 
 # define tfidf model
 tfidf = TfIdf$new()
@@ -347,47 +372,17 @@ dim(dtm)
 colnames(dtm) <- paste0(("bow_"), colnames(dtm))
 
 df2 = cbind(df, as.matrix(dtm))
-
-set.seed(123)
-# Don't want to use either of these for prediction, and the - sign doesn't work
-# with rpart forumulas.
-colnames(df)
-df_text = subset(df2, select=c(-id, -story, -nonpayment, -country, -sector, -gender, -loan_amount))
-dim(df_text)
-
-
-
-# Split the data into training and testing.
-train_text <- sample_frac(df_text, 0.8)
-test_text <- setdiff(df_text, train_text)
-
-
-# Let's create the model.
-form = as.formula(status ~ .)
-tree.text <- rpart(form, train_text, method="class")
-tree.text
-rpart.plot(tree.text, extra=2)
-pred = predict(tree.text, train_text, type="class")
-head(pred)
-caret::confusionMatrix(pred, train_text$status)
-
-
-
-
-require(randomForest)
-set.seed(111)
-rf = randomForest(form, data=train_text, importance=TRUE, nodesize=42, mtry=10, ntree=100)
-round(importance(rf), 2)
-varImpPlot(rf, n.var=10)
+head(df2)
 ```
 
-FH:
+Feature hashing:
 
 ```{r}
-h_vectorizer = hash_vectorizer(hash_size = 2 ^ 14, ngram = c(1L, 2L))
-dtm_h = create_dtm(it_train, h_vectorizer)
-str(dtm_h)
+h_vectorizer = hash_vectorizer(hash_size = 2 ^ 8, ngram = c(1L, 2L))
+dtm_h = as.data.frame(as.matrix(create_dtm(it_train, h_vectorizer)))
 dim(dtm_h)
-as.data.frame(as.matrix(dtm_h))
+
+df3 = cbind(df, dtm_h)
+head(df3)
 ```
 
