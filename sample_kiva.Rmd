@@ -1,0 +1,11 @@
+---
+title: "Sample of Kiva"
+output: html_notebook
+---
+
+```{r}
+library(tidyverse)
+df <- read_csv("data/kiva.csv")
+df %>%
+  sample
+```
