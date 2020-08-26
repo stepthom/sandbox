@@ -11,3 +11,5 @@ kiva*.pdf
 *_cache
 *_files
 *.zip
+students/
+Untitled*.ipynb
